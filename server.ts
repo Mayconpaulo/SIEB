@@ -269,6 +269,28 @@ async function startServer() {
     res.json({ ok: true });
   });
 
+  // Never let unknown /api/* routes fall through to HTML SPA fallback
+  app.use('/api', (_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Rota de API não encontrada.' });
+  });
+
+  // JSON error handler for malformed payloads or unexpected API errors
+  app.use((err: unknown, req: Request, res: Response, next: express.NextFunction) => {
+    if (req.path.startsWith('/api')) {
+      const status =
+        typeof (err as { status?: number })?.status === 'number'
+          ? (err as { status: number }).status
+          : 500;
+      const message =
+        status === 400
+          ? 'Requisição inválida enviada ao servidor.'
+          : 'Erro interno no servidor de autenticação.';
+      res.status(status).json({ error: message });
+      return;
+    }
+    next(err);
+  });
+
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({

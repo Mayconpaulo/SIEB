@@ -60,11 +60,16 @@ export function slugifyId(input: string, fallbackPrefix = 'escala'): string {
   return cleaned || `${fallbackPrefix}-${Date.now().toString(36)}`;
 }
 
+const DEFAULT_HOLIDAYS: Record<string, string> = {
+  '2026-11-02': 'Feriado',
+};
+
 export function generateDateRangeEntries(
   scheduleId: string,
   startIso: string,
   endIso: string,
-  columnIds: string[]
+  columnIds: string[],
+  holidays: Record<string, string> = {}
 ): ScheduleEntry[] {
   const start = parseIsoDateLocal(startIso);
   const end = parseIsoDateLocal(endIso);
@@ -82,6 +87,7 @@ export function generateDateRangeEntries(
     const d = String(cursor.getDate()).padStart(2, '0');
     const dateIso = `${y}-${m}-${d}`;
     const dow = DAYS_PT[cursor.getDay()] ?? 'Seg';
+    const holidayLabel = holidays[dateIso] ?? '';
     const isWeekend = dow === 'Sáb' || dow === 'Dom';
 
     const assignments: Record<string, string> = {};
@@ -93,8 +99,8 @@ export function generateDateRangeEntries(
       scheduleId,
       date: dateIso,
       dayOfWeek: dow,
-      isRedScale: isWeekend,
-      holidayLabel: '',
+      isRedScale: isWeekend || holidayLabel.length > 0,
+      holidayLabel,
       assignments,
       notes: '',
     });
@@ -106,16 +112,46 @@ export function generateDateRangeEntries(
   return results;
 }
 
-// --- Faithful Transcription of the 2 Attached Physical Spreadsheets (01 nov – 01 dez) ---
+// --- Structures & Dates (01 nov – 01 dez) of all 6 Battalion Schedules (No Pre-filled Soldier Names) ---
 
 export const INITIAL_SCHEDULES: ScheduleModel[] = [
+  {
+    id: 'auxiliares-supervisores',
+    name: 'Auxiliares e Supervisores',
+    shortCode: 'Aux / Sup Dia',
+    description:
+      'Escala de Auxiliar de Supervisor de Dia ao CML, Supervisor de Dia à 1ª DE, Auxiliar de Supervisor de Dia à 1ª DE e Referência.',
+    order: 1,
+    active: true,
+    columns: [
+      { id: 'aux_sup_dia_cml', label: 'Aux Sup Dia CML', kind: 'primary' },
+      { id: 'sup_dia_1de', label: 'Sup Dia 1ª DE', kind: 'primary' },
+      { id: 'aux_sup_dia_1de', label: 'Aux Sup Dia 1ª DE', kind: 'secondary' },
+      { id: 'ref_aux_sp_dia_1de', label: 'Ref Aux Sp Dia 1ª DE', kind: 'reference' },
+    ],
+  },
+  {
+    id: 'oficiais-comandantes',
+    name: 'Oficiais e Comandantes',
+    shortCode: 'Of Dia / Pel Seg',
+    description:
+      'Escala de Oficial de Dia, Comandante do 2º Pelotão de Segurança, Referência de Comandante do 2º Pel Seg e Oficial de Dia GUEs.',
+    order: 2,
+    active: true,
+    columns: [
+      { id: 'of_dia', label: 'Of Dia', kind: 'primary' },
+      { id: 'cmt_2_pel_seg', label: 'Cmt 2º Pel Seg', kind: 'secondary' },
+      { id: 'ref_cmt_2_pel_seg', label: 'Ref Cmt 2º Pel Seg', kind: 'reference' },
+      { id: 'of_dia_gues', label: 'Of Dia GUEs', kind: 'reference' },
+    ],
+  },
   {
     id: 'adjuntos-oficial-dia',
     name: 'Adjuntos de Oficial de Dia',
     shortCode: 'Adj Of Dia',
     description:
-      'Escala mensal de Adjunto de Oficial de Dia do Batalhão, GUEs e 1ª DE — preservando nomenclatura e substituições registradas na planilha física.',
-    order: 1,
+      'Escala mensal de Adjunto de Oficial de Dia do Batalhão, Adjunto de Oficial de Dia GUEs e 1ª DE.',
+    order: 3,
     active: true,
     columns: [
       { id: 'adj_of_dia', label: 'Adj Of Dia', kind: 'primary' },
@@ -129,7 +165,7 @@ export const INITIAL_SCHEDULES: ScheduleModel[] = [
     shortCode: 'Cmt Gda / G Seg',
     description:
       'Escala de Comandante da Guarda do Batalhão e Comandantes dos Grupos de Segurança (XI, VI, VII, V, VIII e XII).',
-    order: 2,
+    order: 4,
     active: true,
     columns: [
       { id: 'cmt_gda_btl', label: 'Cmt Gda Btl', kind: 'primary' },
@@ -141,92 +177,53 @@ export const INITIAL_SCHEDULES: ScheduleModel[] = [
       { id: 'cmt_g_seg_xii', label: 'Cmt G Seg XII', kind: 'secondary' },
     ],
   },
+  {
+    id: 'cabos-guarda-seguranca',
+    name: 'Cabos da Guarda e Grupos de Segurança',
+    shortCode: 'Cb Gda / G Seg',
+    description:
+      'Escala de Cabo da Vila dos Oficiais, Cabo da Guarda do Batalhão e Cabos dos Grupos de Segurança (XI, VI, VII, V, VIII e XII).',
+    order: 5,
+    active: true,
+    columns: [
+      { id: 'cb_vila_of', label: 'Cb Vila Of', kind: 'primary' },
+      { id: 'cb_gda_btl', label: 'Cb Gda Btl', kind: 'primary' },
+      { id: 'cb_g_seg_xi', label: 'Cb G Seg XI', kind: 'secondary' },
+      { id: 'cb_g_seg_vi', label: 'Cb G Seg VI', kind: 'secondary' },
+      { id: 'cb_g_seg_vii', label: 'Cb G Seg VII', kind: 'secondary' },
+      { id: 'cb_g_seg_v', label: 'Cb G Seg V', kind: 'secondary' },
+      { id: 'cb_g_seg_viii', label: 'Cb G Seg VIII', kind: 'secondary' },
+      { id: 'cb_g_seg_xii', label: 'Cb G Seg XII', kind: 'secondary' },
+    ],
+  },
+  {
+    id: 'apoio-spa-saude-corneteiro',
+    name: 'Apoio ao SPA, Saúde, Carcerária e Corneteiro',
+    shortCode: 'SPA / Saúde / GUEs',
+    description:
+      'Escala de Apoio ao SPA, Técnico em Enfermagem ao SPA, Padioleiro ao HGERJ, Carcerária (Sobreaviso) e Corneteiro de Dia ao GUEs.',
+    order: 6,
+    active: true,
+    columns: [
+      { id: 'apoio_spa', label: 'Apoio ao SPA', kind: 'primary' },
+      { id: 'tec_enfermagem_spa', label: 'Téc em Enfermagem ao SPA', kind: 'primary' },
+      { id: 'padioleiro_hgerj', label: 'Padioleiro ao HGERJ', kind: 'secondary' },
+      { id: 'carceraria_sobreaviso', label: 'Carcerária (Sobreaviso)', kind: 'secondary' },
+      { id: 'corneteiro_dia_gues', label: 'Corneteiro de Dia ao GUEs', kind: 'reference' },
+    ],
+  },
 ];
 
-function makeEntry(
-  scheduleId: string,
-  date: string,
-  assignments: Record<string, string>,
-  holidayLabel = ''
-): ScheduleEntry {
-  const dayOfWeek = getDayOfWeekPt(date);
-  const isRedScale = dayOfWeek === 'Sáb' || dayOfWeek === 'Dom' || holidayLabel.length > 0;
-  return {
-    scheduleId,
-    date,
-    dayOfWeek,
-    isRedScale,
-    holidayLabel,
-    assignments,
-    notes: '',
-  };
-}
-
-export const INITIAL_ENTRIES_BY_SCHEDULE: Record<string, ScheduleEntry[]> = {
-  'adjuntos-oficial-dia': [
-    makeEntry('adjuntos-oficial-dia', '2026-11-01', { adj_of_dia: 'BENACE', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-02', { adj_of_dia: 'RENAN SANTOS', adj_of_dia_gues: '', adj_of_dia_1de: '' }, 'Feriado'),
-    makeEntry('adjuntos-oficial-dia', '2026-11-03', { adj_of_dia: 'GABRIEL', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-04', { adj_of_dia: 'BENACE (LUIS CLAUDIO)', adj_of_dia_gues: '* ALBUQUERQUE (SGT MALTA - GUEs)', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-05', { adj_of_dia: 'RENAN SANTOS', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-06', { adj_of_dia: 'LEON', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-07', { adj_of_dia: 'GOMES', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-08', { adj_of_dia: 'PEDRO CORREA (BENACE)', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-09', { adj_of_dia: 'AFONSO', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-10', { adj_of_dia: 'GABRIELA', adj_of_dia_gues: '* WALLACE (PEDRO CORREA)', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-11', { adj_of_dia: 'LACERDA (GABRIEL)', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-12', { adj_of_dia: 'PEDRO CORREA (WALLACE)', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-13', { adj_of_dia: 'GOMES', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-14', { adj_of_dia: 'GABRIEL', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-15', { adj_of_dia: 'GABRIELA', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-16', { adj_of_dia: 'LUCIANO', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-17', { adj_of_dia: 'RUBIEL', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-18', { adj_of_dia: 'GABRIEL', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-19', { adj_of_dia: 'LUCIANO', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-20', { adj_of_dia: 'RUBIEL', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-21', { adj_of_dia: 'EMMANUEL', adj_of_dia_gues: '* ALBUQUERQUE (MALTA - GUEs)', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-22', { adj_of_dia: 'AFONSO', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-23', { adj_of_dia: 'BENACE', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-24', { adj_of_dia: 'LUIS CLAUDIO', adj_of_dia_gues: '* ALBUQUERQUE (MALTA - GUEs)', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-25', { adj_of_dia: 'BRITO (AFONSO)', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-26', { adj_of_dia: 'AFONSO (BRITO)', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-27', { adj_of_dia: 'GABRIELA', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-28', { adj_of_dia: 'LUIS CLAUDIO', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-29', { adj_of_dia: 'BRITO', adj_of_dia_gues: '', adj_of_dia_1de: 'SGT CERQUEIRA' }),
-    makeEntry('adjuntos-oficial-dia', '2026-11-30', { adj_of_dia: 'WALLACE', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-    makeEntry('adjuntos-oficial-dia', '2026-12-01', { adj_of_dia: 'PEDRO CORREA', adj_of_dia_gues: '', adj_of_dia_1de: '' }),
-  ],
-  'comandantes-guarda-seguranca': [
-    makeEntry('comandantes-guarda-seguranca', '2026-11-01', { cmt_gda_btl: 'ALENCAR', cmt_g_seg_xi: '* SOBRINHO', cmt_g_seg_vi: '* ANDRADE SILVA', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-02', { cmt_gda_btl: 'CRUZ', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '* CARVALHO', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '* BUENO' }, 'Feriado'),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-03', { cmt_gda_btl: 'GABINA', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '* CAIO LUCAS', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-04', { cmt_gda_btl: 'GEORGE (BUENO)', cmt_g_seg_xi: '* LUCAS MARQUES', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '* OLIVEIRA (ANDRADE SILVA)', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-05', { cmt_gda_btl: 'BUENO (GEORGE)', cmt_g_seg_xi: '', cmt_g_seg_vi: '* EDUARDO', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '* VICTOR SOARES' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-06', { cmt_gda_btl: 'CRUZ', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '* SOBRINHO', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-07', { cmt_gda_btl: 'PRATA', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '* AVELLAR (DE LACERDA)', cmt_g_seg_viii: '* CORADO', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-08', { cmt_gda_btl: 'OLIVEIRA', cmt_g_seg_xi: '* DE LACERDA (AVELLAR)', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '* VICTOR SOARES' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-09', { cmt_gda_btl: 'MAGALHÃES', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '* SUZART', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-10', { cmt_gda_btl: 'ALENCAR', cmt_g_seg_xi: '', cmt_g_seg_vi: '* CAIO LUCAS', cmt_g_seg_vii: '', cmt_g_seg_v: '* PRATA', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-11', { cmt_gda_btl: 'ANDRADE SILVA', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '* AVELLAR', cmt_g_seg_xii: '* DE LACERDA' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-12', { cmt_gda_btl: 'JESUS (GABINA)', cmt_g_seg_xi: '* FLAVIO', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-13', { cmt_gda_btl: 'CARINE', cmt_g_seg_xi: '', cmt_g_seg_vi: '* GABINA (JESUS)', cmt_g_seg_vii: '* CORADO', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-14', { cmt_gda_btl: 'MAGALHÃES', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '* SUZART (PRATA)', cmt_g_seg_xii: '* CAIO LUCAS (DE LACERDA)' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-15', { cmt_gda_btl: 'GEORGE', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '* FLAVIO', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-16', { cmt_gda_btl: 'DE OLIVEIRA (ANDRADE SILVA)', cmt_g_seg_xi: '', cmt_g_seg_vi: '* ARAÚJO', cmt_g_seg_vii: '* BUSTAMANTE', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-17', { cmt_gda_btl: 'ROBERT', cmt_g_seg_xi: '* LUNA (MENEGATTE)', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '* LUCAS COSTA', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-18', { cmt_gda_btl: 'MENEGATTE (LUNA)', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '* CAIO EDUARDO' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-19', { cmt_gda_btl: 'DE OLIVEIRA (GEORGE)', cmt_g_seg_xi: '', cmt_g_seg_vi: '* ARAÚJO', cmt_g_seg_vii: '', cmt_g_seg_v: '* BUSTAMANTE', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-20', { cmt_gda_btl: 'CARINE (BUENO)', cmt_g_seg_xi: '* ROBERT (LUCAS COSTA)', cmt_g_seg_vi: '', cmt_g_seg_vii: '* COUTO', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-21', { cmt_gda_btl: 'MENEGATTE (LUNA)', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '* CAIO EDUARDO' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-22', { cmt_gda_btl: 'CHAGAS', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '* GABINA', cmt_g_seg_viii: '* LUCAS COSTA', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-23', { cmt_gda_btl: 'CARVALHO', cmt_g_seg_xi: '* LUCAS MARQUES', cmt_g_seg_vi: '* COUTO', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-24', { cmt_gda_btl: 'PUPPIN (BUENO)', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '* VICTOR SANTOS', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-25', { cmt_gda_btl: 'CHAGAS', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '* SANTOS', cmt_g_seg_xii: '* VICTOR SOARES' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-26', { cmt_gda_btl: 'GEORGE', cmt_g_seg_xi: '* SOBRINHO', cmt_g_seg_vi: '* BUENO (LUNA)', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-27', { cmt_gda_btl: 'PINHEIRO', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '* SUZART', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-28', { cmt_gda_btl: 'PUPPIN', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '* VICTOR SANTOS', cmt_g_seg_viii: '* SANTOS', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-29', { cmt_gda_btl: 'JESUS', cmt_g_seg_xi: '* LUNA', cmt_g_seg_vi: '* LUCAS MARQUES', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-11-30', { cmt_gda_btl: 'CRUZ', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '', cmt_g_seg_v: '', cmt_g_seg_viii: '', cmt_g_seg_xii: '* CAIO LUCAS' }),
-    makeEntry('comandantes-guarda-seguranca', '2026-12-01', { cmt_gda_btl: 'MAGALHÃES', cmt_g_seg_xi: '', cmt_g_seg_vi: '', cmt_g_seg_vii: '* GABINA (ARAÚJO)', cmt_g_seg_v: '* ANDRADE SILVA', cmt_g_seg_viii: '', cmt_g_seg_xii: '' }),
-  ],
-};
+// Generate 01 nov – 01 dez (31 days) with empty assignment cells for every schedule
+export const INITIAL_ENTRIES_BY_SCHEDULE: Record<string, ScheduleEntry[]> = Object.fromEntries(
+  INITIAL_SCHEDULES.map((schedule) => [
+    schedule.id,
+    generateDateRangeEntries(
+      schedule.id,
+      '2026-11-01',
+      '2026-12-01',
+      schedule.columns.map((c) => c.id),
+      DEFAULT_HOLIDAYS
+    ),
+  ])
+);

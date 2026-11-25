@@ -25,6 +25,7 @@ import {
   type ScheduleEntry,
   type ScheduleModel,
 } from '../types/schedule';
+import { verifyAdminToken } from './adminApi';
 import { db, handleFirestoreError, OperationType } from './firebase';
 
 function formatTimestamp(val: unknown): string {
@@ -64,13 +65,8 @@ export async function verifyServerAdminToken(token: string | null): Promise<void
   if (!token) {
     throw new Error('Sessão administrativa ausente. Faça login com a senha administrativa.');
   }
-  const res = await fetch('/api/admin/verify', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-  if (!res.ok) {
+  const valid = await verifyAdminToken(token);
+  if (!valid) {
     throw new Error('Sessão administrativa expirada. Informe a senha novamente.');
   }
 }
@@ -199,54 +195,90 @@ export function subscribeToAuditLogs(
 
 // --- Admin Mutations (Always verified against Server Token + Firestore Admin Rules) ---
 
+async function writeSchedulesToFirestore(
+  schedulesToWrite: ScheduleModel[],
+  summary: string,
+  details: string
+): Promise<void> {
+  // Commit one batch per schedule so every write stays well within Firestore's 500-op batch limit
+  for (const schedule of schedulesToWrite) {
+    const batch = writeBatch(db);
+    const scheduleRef = doc(db, 'schedules', schedule.id);
+    batch.set(scheduleRef, {
+      id: schedule.id,
+      name: schedule.name.slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN),
+      shortCode: schedule.shortCode.slice(0, BLUEPRINT_LIMITS.MAX_SHORT_CODE_LEN),
+      description: schedule.description.slice(0, BLUEPRINT_LIMITS.MAX_DESC_LEN),
+      order: schedule.order,
+      columns: sanitizeColumns(schedule.columns),
+      active: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    const entries = INITIAL_ENTRIES_BY_SCHEDULE[schedule.id] ?? [];
+    for (const entry of entries) {
+      const entryRef = doc(db, 'schedules', schedule.id, 'entries', entry.date);
+      batch.set(entryRef, {
+        scheduleId: schedule.id,
+        date: entry.date,
+        dayOfWeek: entry.dayOfWeek,
+        isRedScale: entry.isRedScale,
+        holidayLabel: entry.holidayLabel.slice(0, BLUEPRINT_LIMITS.MAX_HOLIDAY_LEN),
+        assignments: sanitizeAssignments(entry.assignments),
+        notes: entry.notes.slice(0, BLUEPRINT_LIMITS.MAX_NOTES_LEN),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    await batch.commit();
+  }
+
+  const logId = createAuditLogId();
+  await setDoc(doc(db, 'audit_logs', logId), {
+    action: 'seed_initial',
+    scheduleId: schedulesToWrite[0]?.id ?? INITIAL_SCHEDULES[0].id,
+    scheduleName: 'Escalas Base',
+    summary: summary.slice(0, BLUEPRINT_LIMITS.MAX_SUMMARY_LEN),
+    details: details.slice(0, BLUEPRINT_LIMITS.MAX_DETAILS_LEN),
+    actorLabel: 'Administrador',
+    createdAt: serverTimestamp(),
+  });
+}
+
 export async function seedInitialSchedulesToFirestore(adminToken: string): Promise<void> {
   await verifyServerAdminToken(adminToken);
 
   try {
-    const batch = writeBatch(db);
+    await writeSchedulesToFirestore(
+      INITIAL_SCHEDULES,
+      `Publicação inicial das ${INITIAL_SCHEDULES.length} estruturas base de escala (sem nomes preenchidos)`,
+      `${INITIAL_SCHEDULES.length} modelos com 31 datas (01 nov a 01 dez) prontos para preenchimento no banco online.`
+    );
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'schedules');
+  }
+}
 
-    for (const schedule of INITIAL_SCHEDULES) {
-      const scheduleRef = doc(db, 'schedules', schedule.id);
-      batch.set(scheduleRef, {
-        id: schedule.id,
-        name: schedule.name.slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN),
-        shortCode: schedule.shortCode.slice(0, BLUEPRINT_LIMITS.MAX_SHORT_CODE_LEN),
-        description: schedule.description.slice(0, BLUEPRINT_LIMITS.MAX_DESC_LEN),
-        order: schedule.order,
-        columns: sanitizeColumns(schedule.columns),
-        active: true,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+export async function syncMissingBaseSchedulesToFirestore(
+  adminToken: string,
+  existingIds: string[]
+): Promise<number> {
+  await verifyServerAdminToken(adminToken);
 
-      const entries = INITIAL_ENTRIES_BY_SCHEDULE[schedule.id] ?? [];
-      for (const entry of entries) {
-        const entryRef = doc(db, 'schedules', schedule.id, 'entries', entry.date);
-        batch.set(entryRef, {
-          scheduleId: schedule.id,
-          date: entry.date,
-          dayOfWeek: entry.dayOfWeek,
-          isRedScale: entry.isRedScale,
-          holidayLabel: entry.holidayLabel.slice(0, BLUEPRINT_LIMITS.MAX_HOLIDAY_LEN),
-          assignments: sanitizeAssignments(entry.assignments),
-          notes: entry.notes.slice(0, BLUEPRINT_LIMITS.MAX_NOTES_LEN),
-          updatedAt: serverTimestamp(),
-        });
-      }
-    }
+  const existingSet = new Set(existingIds);
+  const missing = INITIAL_SCHEDULES.filter((s) => !existingSet.has(s.id));
+  if (missing.length === 0) {
+    return 0;
+  }
 
-    const logId = createAuditLogId();
-    batch.set(doc(db, 'audit_logs', logId), {
-      action: 'seed_initial',
-      scheduleId: INITIAL_SCHEDULES[0].id,
-      scheduleName: 'Escalas Iniciais',
-      summary: 'Publicação inicial das 2 escalas base (Adjuntos e Comandantes da Guarda)',
-      details: '62 registros diários (01 nov a 01 dez) sincronizados no banco online.',
-      actorLabel: 'Administrador',
-      createdAt: serverTimestamp(),
-    });
-
-    await batch.commit();
+  try {
+    await writeSchedulesToFirestore(
+      missing,
+      `${missing.length} estrutura(s) base adicionada(s) ao banco online`,
+      `Modelos sincronizados sem nomes preenchidos: ${missing.map((m) => m.name).join(', ')}.`
+    );
+    return missing.length;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'schedules');
   }

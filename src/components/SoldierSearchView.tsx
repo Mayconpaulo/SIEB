@@ -115,7 +115,7 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
               type="search"
               value={queryText}
               onChange={(e) => setQueryText(e.target.value)}
-              placeholder="Digite o nome de guerra (ex: GABRIEL, BUENO, ALBUQUERQUE)..."
+              placeholder="Digite o nome de guerra do militar..."
               aria-label="Nome de guerra do militar"
               autoFocus
               className="w-full min-h-[44px] pl-10 pr-9 py-2 text-sm bg-[#F7F8F7] border border-[#DCE1DC] rounded-lg text-[#141A16] placeholder:text-[#7A877E] focus:bg-white focus:outline-none focus:border-[#1B4332]"

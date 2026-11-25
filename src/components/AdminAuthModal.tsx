@@ -1,6 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { signInWithPopup } from 'firebase/auth';
-import { AlertCircle, CheckCircle2, KeyRound, Lock, ShieldCheck, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, KeyRound, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import {
+  AdminApiError,
+  getAdminStatus,
+  loginAdminPassword,
+  logoutAdminToken,
+  setupAdminPassword,
+} from '../lib/adminApi';
 import { auth, googleProvider } from '../lib/firebase';
 
 interface AdminAuthModalProps {
@@ -15,6 +22,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   onAuthenticated,
 }) => {
   const [loadingStatus, setLoadingStatus] = useState(true);
+  const [statusError, setStatusError] = useState('');
   const [needsSetup, setNeedsSetup] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -25,33 +33,33 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [verifiedServerToken, setVerifiedServerToken] = useState<string | null>(null);
   const [linkingDb, setLinkingDb] = useState(false);
 
+  const loadStatus = useCallback(async () => {
+    setLoadingStatus(true);
+    setStatusError('');
+    setErrorMsg('');
+    try {
+      const data = await getAdminStatus();
+      setNeedsSetup(!data.configured);
+    } catch (err) {
+      const msg =
+        err instanceof AdminApiError
+          ? err.message
+          : 'Não foi possível consultar o servidor de autenticação.';
+      setStatusError(msg);
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) return;
     setPassword('');
     setConfirmPassword('');
     setErrorMsg('');
+    setStatusError('');
     setVerifiedServerToken(null);
-    setLoadingStatus(true);
-
-    let cancelled = false;
-    fetch('/api/admin/status')
-      .then((res) => res.json())
-      .then((data) => {
-        if (cancelled) return;
-        setNeedsSetup(!data.configured);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setErrorMsg('Não foi possível consultar o servidor de autenticação.');
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingStatus(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isOpen]);
+    void loadStatus();
+  }, [isOpen, loadStatus]);
 
   if (!isOpen) return null;
 
@@ -61,22 +69,9 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     setSubmitting(true);
 
     try {
-      const endpoint = needsSetup ? '/api/admin/setup' : '/api/admin/login';
-      const body = needsSetup ? { password, confirmPassword } : { password };
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (data.needsSetup) {
-          setNeedsSetup(true);
-        }
-        setErrorMsg(data.error || 'Não foi possível validar a senha administrativa.');
-        return;
-      }
+      const data = needsSetup
+        ? await setupAdminPassword(password, confirmPassword)
+        : await loginAdminPassword(password);
 
       const token = String(data.token || '');
       if (!token) {
@@ -90,8 +85,15 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       } else {
         setVerifiedServerToken(token);
       }
-    } catch {
-      setErrorMsg('Erro de conexão com o servidor. Verifique sua internet e tente novamente.');
+    } catch (err) {
+      if (err instanceof AdminApiError) {
+        if (err.needsSetup) {
+          setNeedsSetup(true);
+        }
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg('Erro inesperado ao validar a senha administrativa.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -112,6 +114,14 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       const code = (err as { code?: string })?.code;
       if (code === 'auth/popup-closed-by-user') {
         setErrorMsg('Autorização cancelada. Conclua a confirmação para habilitar gravações no banco.');
+      } else if (code === 'auth/popup-blocked') {
+        setErrorMsg(
+          'O navegador bloqueou a janela de autorização Google. Permita pop-ups para este site e tente novamente.'
+        );
+      } else if (code === 'auth/unauthorized-domain') {
+        setErrorMsg(
+          'Domínio não autorizado no Firebase Authentication. Abra o aplicativo pelo endereço oficial ou adicione o domínio nas configurações.'
+        );
       } else {
         setErrorMsg('Não foi possível autorizar a conta administradora do banco de dados.');
       }
@@ -123,10 +133,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const handleCancel = () => {
     // If server token was issued in step 1 and user cancels step 2, revoke it immediately
     if (verifiedServerToken) {
-      void fetch('/api/admin/logout', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${verifiedServerToken}` },
-      });
+      void logoutAdminToken(verifiedServerToken);
     }
     onClose();
   };
@@ -164,6 +171,33 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           {loadingStatus ? (
             <div className="py-6 text-center text-sm text-[#5A665E]">
               Verificando política de acesso no servidor...
+            </div>
+          ) : statusError ? (
+            <div className="space-y-4">
+              <div
+                role="alert"
+                className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B]"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{statusError}</span>
+              </div>
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#4A554E] hover:text-[#141A16] rounded-lg cursor-pointer"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadStatus()}
+                  className="inline-flex items-center gap-2 min-h-[40px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  <span>Tentar novamente</span>
+                </button>
+              </div>
             </div>
           ) : verifiedServerToken ? (
             /* Step 2: Link database write permission */

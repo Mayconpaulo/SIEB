@@ -21,6 +21,7 @@ import {
   formatShortDatePt,
   generateDateRangeEntries,
   getDayOfWeekPt,
+  INITIAL_SCHEDULES,
   slugifyId,
 } from '../data/initialSchedules';
 import {
@@ -30,6 +31,7 @@ import {
   renameEntryDate,
   saveEntriesBatch,
   seedInitialSchedulesToFirestore,
+  syncMissingBaseSchedulesToFirestore,
   updateScheduleModel,
 } from '../lib/scheduleService';
 import {
@@ -211,14 +213,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setFeedback({ type: 'error', text: msg });
   };
 
+  const missingBaseSchedulesCount = useMemo(() => {
+    const existingIds = new Set(schedules.map((s) => s.id));
+    return INITIAL_SCHEDULES.filter((s) => !existingIds.has(s.id)).length;
+  }, [schedules]);
+
   const handleSeedInitialData = async () => {
     setFeedback(null);
-    setBusyMessage('Publicando as 2 escalas iniciais no banco online...');
+    setBusyMessage(`Publicando as ${INITIAL_SCHEDULES.length} estruturas base no banco online...`);
     try {
       await seedInitialSchedulesToFirestore(adminToken);
       setFeedback({
         type: 'success',
-        text: 'Escalas iniciais publicadas no banco online. Todos os visualizadores já recebem atualizações em tempo real.',
+        text: `As ${INITIAL_SCHEDULES.length} estruturas de escala (sem nomes preenchidos) foram publicadas no banco online.`,
+      });
+    } catch (err) {
+      handleActionError(err);
+    } finally {
+      setBusyMessage('');
+    }
+  };
+
+  const handleSyncMissingBaseSchedules = async () => {
+    setFeedback(null);
+    setBusyMessage('Sincronizando estruturas base faltantes no banco online...');
+    try {
+      const added = await syncMissingBaseSchedulesToFirestore(
+        adminToken,
+        schedules.map((s) => s.id)
+      );
+      setFeedback({
+        type: 'success',
+        text:
+          added > 0
+            ? `${added} nova(s) estrutura(s) de escala adicionada(s) sem alterar os modelos existentes.`
+            : 'Todas as estruturas base já estão presentes no banco online.',
       });
     } catch (err) {
       handleActionError(err);
@@ -588,11 +617,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="bg-[#ECF6F0] border border-[#1B4332]/30 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h2 className="text-sm font-semibold text-[#141A16]">
-              Inicializar Banco de Dados Online com as 2 Planilhas Base
+              Inicializar Banco de Dados Online com as {INITIAL_SCHEDULES.length} Estruturas Base
             </h2>
             <p className="text-xs text-[#3E4841] leading-relaxed max-w-2xl">
-              As escalas de <strong>Adjuntos de Oficial de Dia</strong> e{' '}
-              <strong>Comandantes da Guarda e Grupos de Segurança</strong> (01 nov – 01 dez) ainda não foram gravadas no banco online. Publique-as agora para habilitar edição e sincronização em tempo real.
+              As {INITIAL_SCHEDULES.length} planilhas do batalhão (estrutura de colunas e datas de{' '}
+              <strong>01 nov – 01 dez</strong>, sem nomes preenchidos) ainda não foram gravadas no banco online. Publique-as agora para habilitar edição e sincronização em tempo real.
             </p>
           </div>
           <button
@@ -602,7 +631,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] disabled:opacity-60 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
           >
             <CloudUpload className="w-4 h-4" />
-            <span>Publicar escalas iniciais</span>
+            <span>Publicar {INITIAL_SCHEDULES.length} estruturas base</span>
           </button>
         </div>
       )}
@@ -851,17 +880,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 Modelos de Escala Cadastrados ({schedules.length})
               </h2>
               <p className="text-xs text-[#5A665E]">
-                Adicione novas escalas (como as próximas 4 planilhas do batalhão) ou personalize colunas sem alterar os modelos existentes.
+                Adicione novas escalas ou personalize colunas e funções sem alterar os modelos existentes.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openCreateModelModal}
-              className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg whitespace-nowrap cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Criar nova escala</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {isCloudSynced && missingBaseSchedulesCount > 0 && (
+                <button
+                  type="button"
+                  disabled={Boolean(busyMessage)}
+                  onClick={() => void handleSyncMissingBaseSchedules()}
+                  className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-[#1B4332] bg-[#ECF6F0] hover:bg-[#DCEEE3] border border-[#1B4332]/25 disabled:opacity-60 rounded-lg whitespace-nowrap cursor-pointer"
+                >
+                  <CloudUpload className="w-4 h-4" />
+                  <span>Adicionar {missingBaseSchedulesCount} modelo(s) base</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openCreateModelModal}
+                className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg whitespace-nowrap cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Criar nova escala</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

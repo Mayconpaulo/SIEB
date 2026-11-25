@@ -10,6 +10,7 @@ import { OfflineIndicator } from './components/PWAInstallButton';
 import { ScheduleViewer } from './components/ScheduleViewer';
 import { SoldierSearchView } from './components/SoldierSearchView';
 import { getTodayIsoLocal, INITIAL_SCHEDULES } from './data/initialSchedules';
+import { logoutAdminToken } from './lib/adminApi';
 import { auth } from './lib/firebase';
 import {
   subscribeToAuditLogs,
@@ -89,15 +90,7 @@ export default function App() {
     const tokenToRevoke = adminTokenRef.current;
     setAdminToken(null);
     if (tokenToRevoke) {
-      try {
-        await fetch('/api/admin/logout', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${tokenToRevoke}` },
-          keepalive: true,
-        });
-      } catch {
-        // Ignore network errors on logout
-      }
+      await logoutAdminToken(tokenToRevoke, true);
     }
     try {
       if (auth.currentUser) {
@@ -113,11 +106,7 @@ export default function App() {
     const handleUnload = () => {
       const token = adminTokenRef.current;
       if (token) {
-        void fetch('/api/admin/logout', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          keepalive: true,
-        });
+        void logoutAdminToken(token, true);
       }
     };
     window.addEventListener('beforeunload', handleUnload);
