@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { signOut } from 'firebase/auth';
+import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AuditHistoryView } from './components/AuditHistoryView';
@@ -12,6 +13,7 @@ import { SoldierSearchView } from './components/SoldierSearchView';
 import { getTodayIsoLocal, INITIAL_SCHEDULES } from './data/initialSchedules';
 import { logoutAdminToken } from './lib/adminApi';
 import { auth } from './lib/firebase';
+import { TRANSITION_VIEW, VIEW_VARIANTS } from './lib/motion';
 import {
   subscribeToAuditLogs,
   subscribeToScheduleEntries,
@@ -149,100 +151,117 @@ export default function App() {
   };
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen flex flex-col bg-[#F7F8F7] text-[#141A16]">
-        <Header
-          activeView={activeView}
-          onNavigate={(v) => handleNavigate(v)}
-          isAdminActive={activeView === 'admin' && Boolean(adminToken)}
-          onAdminAction={handleAdminButtonClick}
-        />
+    <MotionConfig reducedMotion="user">
+      <ErrorBoundary>
+        <div className="min-h-screen flex flex-col bg-transparent text-[#E4EAE6]">
+          <Header
+            activeView={activeView}
+            onNavigate={(v) => handleNavigate(v)}
+            isAdminActive={activeView === 'admin' && Boolean(adminToken)}
+            onAdminAction={handleAdminButtonClick}
+          />
 
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 md:pb-12">
-          {activeView === 'home' && (
-            <HomeOverview
-              schedules={schedules}
-              entriesBySchedule={entriesBySchedule}
-              todayIso={todayIso}
-              loading={loadingSchedules}
-              onOpenSchedule={handleOpenSchedule}
-              onOpenSearch={handleOpenSearch}
-            />
-          )}
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 pb-24 md:pb-12">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeView}
+                variants={VIEW_VARIANTS}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={TRANSITION_VIEW}
+              >
+                {activeView === 'home' && (
+                  <HomeOverview
+                    schedules={schedules}
+                    entriesBySchedule={entriesBySchedule}
+                    todayIso={todayIso}
+                    loading={loadingSchedules}
+                    onOpenSchedule={handleOpenSchedule}
+                    onOpenSearch={handleOpenSearch}
+                  />
+                )}
 
-          {activeView === 'schedules' && (
-            <ScheduleViewer
-              schedules={schedules}
-              selectedScheduleId={selectedScheduleId}
-              onSelectSchedule={setSelectedScheduleId}
-              entries={entriesBySchedule[selectedScheduleId] ?? []}
-              todayIso={todayIso}
-              viewMode={viewMode}
-              onChangeViewMode={setViewMode}
-              focusedDate={focusedDate}
-              onChangeFocusedDate={setFocusedDate}
-            />
-          )}
+                {activeView === 'schedules' && (
+                  <ScheduleViewer
+                    schedules={schedules}
+                    selectedScheduleId={selectedScheduleId}
+                    onSelectSchedule={setSelectedScheduleId}
+                    entries={entriesBySchedule[selectedScheduleId] ?? []}
+                    todayIso={todayIso}
+                    viewMode={viewMode}
+                    onChangeViewMode={setViewMode}
+                    focusedDate={focusedDate}
+                    onChangeFocusedDate={setFocusedDate}
+                  />
+                )}
 
-          {activeView === 'search' && (
-            <SoldierSearchView
-              schedules={schedules}
-              entriesBySchedule={entriesBySchedule}
-              initialQuery={searchSeedQuery}
-              todayIso={todayIso}
-              onJumpToDuty={(scheduleId, dateIso) =>
-                handleOpenSchedule(scheduleId, window.innerWidth < 640 ? 'daily' : 'table', dateIso)
-              }
-            />
-          )}
+                {activeView === 'search' && (
+                  <SoldierSearchView
+                    schedules={schedules}
+                    entriesBySchedule={entriesBySchedule}
+                    initialQuery={searchSeedQuery}
+                    todayIso={todayIso}
+                    onJumpToDuty={(scheduleId, dateIso) =>
+                      handleOpenSchedule(
+                        scheduleId,
+                        window.innerWidth < 640 ? 'daily' : 'table',
+                        dateIso
+                      )
+                    }
+                  />
+                )}
 
-          {activeView === 'history' && <AuditHistoryView logs={auditLogs} />}
+                {activeView === 'history' && <AuditHistoryView logs={auditLogs} />}
 
-          {activeView === 'admin' && adminToken && (
-            <AdminDashboard
-              adminToken={adminToken}
-              isCloudSynced={isCloudSynced}
-              schedules={schedules}
-              entriesBySchedule={entriesBySchedule}
-              auditLogs={auditLogs}
-              onSessionExpired={() => {
-                void terminateAdminSession();
-                setActiveView('home');
-                setShowAdminModal(true);
-              }}
-              onExitAdmin={() => {
-                void terminateAdminSession();
-                setActiveView('home');
-              }}
-            />
-          )}
-        </main>
+                {activeView === 'admin' && adminToken && (
+                  <AdminDashboard
+                    adminToken={adminToken}
+                    isCloudSynced={isCloudSynced}
+                    schedules={schedules}
+                    entriesBySchedule={entriesBySchedule}
+                    auditLogs={auditLogs}
+                    onSessionExpired={() => {
+                      void terminateAdminSession();
+                      setActiveView('home');
+                      setShowAdminModal(true);
+                    }}
+                    onExitAdmin={() => {
+                      void terminateAdminSession();
+                      setActiveView('home');
+                    }}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </main>
 
-        <footer className="hidden md:block border-t border-[#E2E6E2] bg-white">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-[#6B776F]">
-            <span>Escalas de Serviço do Batalhão</span>
-            <span>Consulta pública somente leitura · Edição restrita à administração</span>
-          </div>
-        </footer>
+          <footer className="hidden md:block border-t border-[#EBE0C8]/10 bg-[#080B09]/65 backdrop-blur-md">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-[#7D8F85]">
+              <span className="text-[#98A89F]">Escalas de Serviço do Batalhão</span>
+              <span>Consulta pública somente leitura · Edição restrita à administração</span>
+            </div>
+          </footer>
 
-        <MobileBottomNav
-          activeView={activeView}
-          onNavigate={(v) => handleNavigate(v)}
-          onAdminAction={handleAdminButtonClick}
-        />
+          <MobileBottomNav
+            activeView={activeView}
+            onNavigate={(v) => handleNavigate(v)}
+            onAdminAction={handleAdminButtonClick}
+          />
 
-        <AdminAuthModal
-          isOpen={showAdminModal}
-          onClose={() => setShowAdminModal(false)}
-          onAuthenticated={(token) => {
-            setAdminToken(token);
-            setShowAdminModal(false);
-            setActiveView('admin');
-          }}
-        />
+          <AdminAuthModal
+            isOpen={showAdminModal}
+            onClose={() => setShowAdminModal(false)}
+            onAuthenticated={(token) => {
+              setAdminToken(token);
+              setShowAdminModal(false);
+              setActiveView('admin');
+            }}
+          />
 
-        <OfflineIndicator />
-      </div>
-    </ErrorBoundary>
+          <OfflineIndicator />
+        </div>
+      </ErrorBoundary>
+    </MotionConfig>
   );
 }

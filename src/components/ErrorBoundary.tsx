@@ -25,18 +25,18 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-[#F7F8F7] flex items-center justify-center p-6">
-          <div className="max-w-md w-full bg-white border border-[#DCE1DC] rounded-xl p-6 space-y-4">
-            <h1 className="text-lg font-semibold text-[#141A16]">
+        <div className="min-h-screen bg-[#080B09] flex items-center justify-center p-6">
+          <div className="max-w-md w-full btl-card p-6 space-y-4">
+            <h1 className="font-display text-lg font-semibold text-[#F4E6C4]">
               Não foi possível exibir esta tela
             </h1>
-            <p className="text-sm text-[#4A554E] leading-relaxed">
+            <p className="text-sm text-[#98A89F] leading-relaxed">
               Ocorreu uma falha ao sincronizar ou renderizar os dados das escalas. Tente recarregar a página.
             </p>
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="w-full min-h-[44px] px-4 py-2.5 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg transition-colors cursor-pointer"
+              className="btl-btn btl-btn-primary w-full min-h-[44px] text-sm"
             >
               Recarregar sistema
             </button>

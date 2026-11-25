@@ -1,5 +1,7 @@
 import React from 'react';
+import { motion } from 'motion/react';
 import { Clock } from 'lucide-react';
+import { STAGGER_CONTAINER, STAGGER_ITEM } from '../lib/motion';
 import type { AuditAction, AuditLogEntry } from '../types/schedule';
 
 interface AuditHistoryViewProps {
@@ -32,52 +34,61 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({ logs }) => {
   return (
     <div className="space-y-6">
       <div className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-[#141A16]">
+        <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
           Histórico de Alterações
         </h1>
-        <p className="text-sm text-[#4A554E]">
+        <p className="text-sm text-[#98A89F]">
           Registro cronológico das modificações realizadas pela administração nas escalas de serviço.
         </p>
       </div>
 
       {logs.length === 0 ? (
-        <div className="bg-white border border-[#DCE1DC] rounded-xl p-10 text-center space-y-2">
-          <Clock className="w-6 h-6 text-[#7A877E] mx-auto" />
-          <p className="text-sm font-semibold text-[#141A16]">
+        <div className="btl-card p-10 text-center space-y-2.5">
+          <Clock className="w-6 h-6 text-[#C8A461] mx-auto" />
+          <p className="text-sm font-semibold text-[#F4E6C4]">
             Nenhuma alteração registrada ainda
           </p>
-          <p className="text-xs text-[#5A665E] max-w-md mx-auto">
+          <p className="text-xs text-[#98A89F] max-w-md mx-auto leading-relaxed">
             Assim que o administrador publicar ou editar escalas na Área Administrativa, cada modificação ficará registrada aqui automaticamente.
           </p>
         </div>
       ) : (
-        <div className="bg-white border border-[#DCE1DC] rounded-xl divide-y divide-[#EEF1EE] overflow-hidden">
+        <motion.div
+          variants={STAGGER_CONTAINER}
+          initial="hidden"
+          animate="show"
+          className="btl-card divide-y divide-[#EBE0C8]/10 overflow-hidden"
+        >
           {logs.map((log) => (
-            <div key={log.id} className="px-5 py-4 space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#5A665E]">
+            <motion.div
+              key={log.id}
+              variants={STAGGER_ITEM}
+              className="px-5 py-4 space-y-1.5 hover:bg-[#E4EAE6]/[0.025] transition-colors"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span className="font-semibold text-[#1B4332]">
+                  <span className="font-semibold text-[#E5C17B]">
                     {ACTION_LABELS[log.action] ?? log.action}
                   </span>
-                  <span aria-hidden="true">·</span>
-                  <span className="font-medium text-[#2A352E]">{log.scheduleName}</span>
-                  <span aria-hidden="true">·</span>
+                  <span aria-hidden="true" className="text-[#697870]">·</span>
+                  <span className="font-medium text-[#E4EAE6]">{log.scheduleName}</span>
+                  <span aria-hidden="true" className="text-[#697870]">·</span>
                   <span>{log.actorLabel}</span>
                 </div>
                 <time
                   dateTime={log.createdAt}
-                  className="font-mono tabular-nums text-[#5A665E]"
+                  className="font-mono tabular-nums text-[#7D8F85]"
                 >
                   {formatDateTimePt(log.createdAt)}
                 </time>
               </div>
-              <p className="text-sm font-medium text-[#141A16]">{log.summary}</p>
+              <p className="text-sm font-medium text-[#F4E6C4]">{log.summary}</p>
               {log.details && (
-                <p className="text-xs text-[#5A665E] leading-relaxed">{log.details}</p>
+                <p className="text-xs text-[#98A89F] leading-relaxed">{log.details}</p>
               )}
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
     </div>
   );

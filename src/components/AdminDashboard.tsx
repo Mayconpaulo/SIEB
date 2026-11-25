@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
   ArrowDown,
@@ -24,6 +25,13 @@ import {
   INITIAL_SCHEDULES,
   slugifyId,
 } from '../data/initialSchedules';
+import {
+  SPRING_MODAL,
+  SPRING_TAB,
+  TRANSITION_MICRO,
+  TRANSITION_VIEW,
+  VIEW_VARIANTS,
+} from '../lib/motion';
 import {
   createScheduleModel,
   deleteScheduleModel,
@@ -62,6 +70,12 @@ interface DiffItem {
   before: string;
   after: string;
 }
+
+const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { id: 'entries', label: 'Editar Escalas', icon: Table2 },
+  { id: 'models', label: 'Modelos e Colunas', icon: Layers },
+  { id: 'history', label: 'Histórico', icon: History },
+];
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   adminToken,
@@ -480,7 +494,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     setBusyMessage(
-      editingModel.mode === 'create' ? 'Criando novo modelo de escala...' : 'Salvando estrutura da escala...'
+      editingModel.mode === 'create'
+        ? 'Criando novo modelo de escala...'
+        : 'Salvando estrutura da escala...'
     );
     setFeedback(null);
 
@@ -556,79 +572,66 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Admin Header Strip */}
-      <div className="bg-white border border-[#DCE1DC] rounded-xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="btl-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-xs text-[#1B4332] font-medium">
-            <span>Sessão Administrativa Ativa</span>
-            <span aria-hidden="true">·</span>
-            <span className="text-[#5A665E]">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+            <span className="text-[#A8D8BE] font-semibold">Sessão Administrativa Ativa</span>
+            <span aria-hidden="true" className="text-[#697870]">·</span>
+            <span className="text-[#98A89F]">
               Validada no servidor (senha exigida novamente ao sair)
             </span>
           </div>
-          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#141A16]">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F4E6C4]">
             Painel Administrativo de Escalas
           </h1>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center p-1 bg-[#E9EDE9] rounded-lg">
-            <button
-              type="button"
-              onClick={() => setActiveTab('entries')}
-              className={`inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap cursor-pointer ${
-                activeTab === 'entries'
-                  ? 'bg-white text-[#141A16] shadow-xs'
-                  : 'text-[#4A554E] hover:text-[#141A16]'
-              }`}
-            >
-              <Table2 className="w-4 h-4" />
-              <span>Editar Escalas</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('models')}
-              className={`inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap cursor-pointer ${
-                activeTab === 'models'
-                  ? 'bg-white text-[#141A16] shadow-xs'
-                  : 'text-[#4A554E] hover:text-[#141A16]'
-              }`}
-            >
-              <Layers className="w-4 h-4" />
-              <span>Modelos e Colunas</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('history')}
-              className={`inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap cursor-pointer ${
-                activeTab === 'history'
-                  ? 'bg-white text-[#141A16] shadow-xs'
-                  : 'text-[#4A554E] hover:text-[#141A16]'
-              }`}
-            >
-              <History className="w-4 h-4" />
-              <span>Histórico</span>
-            </button>
+          <div className="btl-tab-track inline-flex items-center gap-1 overflow-x-auto">
+            {ADMIN_TABS.map(({ id, label, icon: Icon }) => {
+              const active = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                    active ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                  }`}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="admin-active-tab"
+                      transition={SPRING_TAB}
+                      className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/22 to-[#2D5A43]/34 border border-[#C8A461]/45 shadow-[inset_0_1px_0_rgba(255,250,236,0.22)]"
+                    />
+                  )}
+                  <Icon className="w-4 h-4 relative z-10" />
+                  <span className="relative z-10">{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
 
       {/* First-Time Cloud Sync Banner (only shown if Firestore schedules collection is still empty) */}
       {!isCloudSynced && (
-        <div className="bg-[#ECF6F0] border border-[#1B4332]/30 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="btl-panel border-[#83B499]/35 bg-[#12261C]/65 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold text-[#141A16]">
+            <h2 className="text-sm font-semibold text-[#F4E6C4]">
               Inicializar Banco de Dados Online com as {INITIAL_SCHEDULES.length} Estruturas Base
             </h2>
-            <p className="text-xs text-[#3E4841] leading-relaxed max-w-2xl">
+            <p className="text-xs text-[#C8D4CD] leading-relaxed max-w-2xl">
               As {INITIAL_SCHEDULES.length} planilhas do batalhão (estrutura de colunas e datas de{' '}
-              <strong>01 nov – 01 dez</strong>, sem nomes preenchidos) ainda não foram gravadas no banco online. Publique-as agora para habilitar edição e sincronização em tempo real.
+              <strong className="text-[#E5C17B]">01 nov – 01 dez</strong>, sem nomes preenchidos) ainda não foram gravadas no banco online. Publique-as agora para habilitar edição e sincronização em tempo real.
             </p>
           </div>
           <button
             type="button"
             disabled={Boolean(busyMessage)}
             onClick={() => void handleSeedInitialData()}
-            className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] disabled:opacity-60 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+            className="btl-btn btl-btn-gold text-sm shrink-0"
           >
             <CloudUpload className="w-4 h-4" />
             <span>Publicar {INITIAL_SCHEDULES.length} estruturas base</span>
@@ -637,826 +640,936 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       )}
 
       {/* Feedback Banner */}
-      {feedback && (
-        <div
-          role="status"
-          className={`flex items-start justify-between gap-3 px-4 py-3 rounded-xl border text-sm ${
-            feedback.type === 'success'
-              ? 'bg-[#ECF6F0] border-[#1B4332]/25 text-[#143326]'
-              : 'bg-[#FEF2F2] border-[#FECACA] text-[#991B1B]'
-          }`}
-        >
-          <div className="flex items-start gap-2.5">
-            {feedback.type === 'success' ? (
-              <Check className="w-4 h-4 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            )}
-            <span>{feedback.text}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setFeedback(null)}
-            className="p-0.5 opacity-70 hover:opacity-100 cursor-pointer"
-            aria-label="Fechar aviso"
+      <AnimatePresence>
+        {feedback && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={TRANSITION_MICRO}
+            role="status"
+            className={`flex items-start justify-between gap-3 px-4 py-3.5 rounded-xl border text-sm backdrop-blur-md ${
+              feedback.type === 'success'
+                ? 'bg-[#2D5A43]/26 border-[#83B499]/35 text-[#A8D8BE]'
+                : 'bg-[#7F1D1D]/26 border-[#F87171]/35 text-[#FECACA]'
+            }`}
           >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-
-      {/* TAB 1: INLINE ENTRY EDITOR */}
-      {activeTab === 'entries' && selectedSchedule && (
-        <div className="space-y-4">
-          <div className="bg-white border border-[#DCE1DC] rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <label className="text-xs font-semibold text-[#4A554E]" htmlFor="admin-schedule-select">
-                Escala:
-              </label>
-              <select
-                id="admin-schedule-select"
-                value={selectedSchedule.id}
-                onChange={(e) => setSelectedScheduleId(e.target.value)}
-                className="min-h-[40px] px-3 py-1.5 text-sm font-medium bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg text-[#141A16] focus:bg-white focus:outline-none focus:border-[#1B4332]"
-              >
-                {schedules.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.columns.length} funções)
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={() => setShowPeriodModal(true)}
-                className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 py-1.5 text-xs sm:text-sm font-medium text-[#141A16] bg-[#F2F4F2] hover:bg-[#E4E9E5] rounded-lg whitespace-nowrap cursor-pointer"
-              >
-                <CalendarPlus className="w-4 h-4" />
-                <span>Criar novo período</span>
-              </button>
+            <div className="flex items-start gap-2.5">
+              {feedback.type === 'success' ? (
+                <Check className="w-4 h-4 shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              )}
+              <span>{feedback.text}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setFeedback(null)}
+              className="p-0.5 opacity-75 hover:opacity-100 cursor-pointer"
+              aria-label="Fechar aviso"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="flex flex-wrap items-center gap-2.5">
-              {pendingDiffs.length > 0 && (
+      <AnimatePresence mode="wait">
+        {/* TAB 1: INLINE ENTRY EDITOR */}
+        {activeTab === 'entries' && selectedSchedule && (
+          <motion.div
+            key="tab-entries"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+            className="space-y-4"
+          >
+            <div className="btl-panel p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <label
+                  className="text-xs font-semibold text-[#C8D4CD]"
+                  htmlFor="admin-schedule-select"
+                >
+                  Escala:
+                </label>
+                <select
+                  id="admin-schedule-select"
+                  value={selectedSchedule.id}
+                  onChange={(e) => setSelectedScheduleId(e.target.value)}
+                  className="btl-select sm:w-auto min-h-[40px] px-3 py-1.5 font-medium"
+                >
+                  {schedules.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.columns.length} funções)
+                    </option>
+                  ))}
+                </select>
+
                 <button
                   type="button"
-                  onClick={() =>
-                    setDraftEntries(
-                      savedEntries.map((e) => ({ ...e, assignments: { ...e.assignments } }))
-                    )
-                  }
-                  className="min-h-[40px] px-3 py-1.5 text-xs sm:text-sm font-medium text-[#5A665E] hover:text-[#141A16] cursor-pointer"
+                  onClick={() => setShowPeriodModal(true)}
+                  className="btl-btn btl-btn-secondary min-h-[40px] px-3.5 py-1.5 text-xs sm:text-sm"
                 >
-                  Descartar ({pendingDiffs.length})
+                  <CalendarPlus className="w-4 h-4 text-[#E5C17B]" />
+                  <span>Criar novo período</span>
                 </button>
-              )}
+              </div>
 
-              <button
-                type="button"
-                disabled={pendingDiffs.length === 0 || Boolean(busyMessage)}
-                onClick={() => setShowPreviewModal(true)}
-                className="inline-flex items-center gap-2 min-h-[42px] px-4 py-2 text-xs sm:text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] disabled:opacity-45 rounded-lg whitespace-nowrap cursor-pointer"
-              >
-                <Eye className="w-4 h-4" />
-                <span>
-                  {pendingDiffs.length > 0
-                    ? `Visualizar e salvar (${pendingDiffs.length})`
-                    : 'Sem alterações pendentes'}
-                </span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5">
+                {pendingDiffs.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDraftEntries(
+                        savedEntries.map((e) => ({ ...e, assignments: { ...e.assignments } }))
+                      )
+                    }
+                    className="btl-btn btl-btn-secondary min-h-[40px] px-3 py-1.5 text-xs sm:text-sm"
+                  >
+                    Descartar ({pendingDiffs.length})
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  disabled={pendingDiffs.length === 0 || Boolean(busyMessage)}
+                  onClick={() => setShowPreviewModal(true)}
+                  className="btl-btn btl-btn-gold min-h-[42px] px-4 py-2 text-xs sm:text-sm"
+                >
+                  <Eye className="w-4 h-4" />
+                  <span>
+                    {pendingDiffs.length > 0
+                      ? `Visualizar e salvar (${pendingDiffs.length})`
+                      : 'Sem alterações pendentes'}
+                  </span>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="bg-white border border-[#DCE1DC] rounded-xl overflow-hidden">
-            <div className="overflow-x-auto schedule-scroll">
-              <table className="w-full border-collapse text-left">
-                <thead>
-                  <tr className="bg-[#16201A] text-white">
-                    <th className="sticky left-0 z-20 bg-[#16201A] px-3.5 py-3 text-xs font-semibold border-r border-white/15 whitespace-nowrap min-w-[165px]">
-                      Data / Dia
-                    </th>
-                    <th className="px-3 py-3 text-xs font-semibold border-r border-white/10 whitespace-nowrap min-w-[130px]">
-                      Vermelha / Feriado
-                    </th>
-                    {selectedSchedule.columns.map((col) => (
-                      <th
-                        key={col.id}
-                        className="px-3 py-3 text-xs font-semibold border-r border-white/10 whitespace-nowrap min-w-[180px]"
-                      >
-                        {col.label}
+            <div className="btl-card overflow-hidden">
+              <div className="overflow-x-auto schedule-scroll">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="bg-[#0B120E] text-[#F4E6C4] border-b border-[#C9A961]/25">
+                      <th className="sticky left-0 z-20 bg-[#0B120E] px-3.5 py-3.5 text-xs font-semibold border-r border-[#EBE0C8]/15 whitespace-nowrap min-w-[168px]">
+                        Data / Dia
                       </th>
-                    ))}
-                    <th className="px-3 py-3 text-xs font-semibold whitespace-nowrap text-right">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#E4E8E4] text-sm">
-                  {draftEntries.map((entry) => {
-                    const isDirty = modifiedDatesSet.has(entry.date);
-                    return (
-                      <tr
-                        key={entry.date}
-                        className={
-                          isDirty
-                            ? 'bg-[#FEFCE8]'
-                            : entry.isRedScale
-                            ? 'bg-[#FDF5F5]'
-                            : 'bg-white'
-                        }
-                      >
-                        <td
-                          className={`sticky left-0 z-10 px-3.5 py-2 border-r border-[#DCE1DC] whitespace-nowrap ${
-                            isDirty
-                              ? 'bg-[#FEF9C3]'
-                              : entry.isRedScale
-                              ? 'bg-[#FCEBEB]'
-                              : 'bg-[#F9FAF9]'
-                          }`}
+                      <th className="px-3 py-3.5 text-xs font-semibold border-r border-[#EBE0C8]/10 whitespace-nowrap min-w-[138px]">
+                        Vermelha / Feriado
+                      </th>
+                      {selectedSchedule.columns.map((col) => (
+                        <th
+                          key={col.id}
+                          className="px-3 py-3.5 text-xs font-semibold border-r border-[#EBE0C8]/10 whitespace-nowrap min-w-[180px]"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span
-                              className={`font-mono text-xs font-semibold tabular-nums ${
-                                entry.isRedScale ? 'text-[#B91C1C]' : 'text-[#141A16]'
-                              }`}
-                            >
-                              {formatShortDatePt(entry.date)} ({entry.dayOfWeek})
-                            </span>
+                          {col.label}
+                        </th>
+                      ))}
+                      <th className="px-3 py-3.5 text-xs font-semibold whitespace-nowrap text-right">
+                        Ações
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
+                    {draftEntries.map((entry) => {
+                      const isDirty = modifiedDatesSet.has(entry.date);
+                      return (
+                        <tr
+                          key={entry.date}
+                          className={
+                            isDirty
+                              ? 'bg-[#C8A461]/14'
+                              : entry.isRedScale
+                              ? 'bg-[#7F1D1D]/18'
+                              : 'bg-transparent hover:bg-[#E4EAE6]/[0.03]'
+                          }
+                        >
+                          <td
+                            className={`sticky left-0 z-10 px-3.5 py-2 border-r border-[#EBE0C8]/12 whitespace-nowrap ${
+                              isDirty
+                                ? 'bg-[#241E12]'
+                                : entry.isRedScale
+                                ? 'bg-[#231012]'
+                                : 'bg-[#0C1310]'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`font-mono text-xs font-semibold tabular-nums ${
+                                  entry.isRedScale
+                                    ? 'text-[#FCA5A5]'
+                                    : isDirty
+                                    ? 'text-[#E5C17B]'
+                                    : 'text-[#E4EAE6]'
+                                }`}
+                              >
+                                {formatShortDatePt(entry.date)} ({entry.dayOfWeek})
+                              </span>
+                              <button
+                                type="button"
+                                title="Alterar data desta linha"
+                                onClick={() => {
+                                  setRenamingEntry(entry);
+                                  setNewDateValue(entry.date);
+                                }}
+                                className="p-1.5 text-[#98A89F] hover:text-[#F4E6C4] rounded transition-colors cursor-pointer"
+                                aria-label={`Alterar data ${entry.date}`}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+
+                          <td className="px-3 py-2 border-r border-[#EBE0C8]/8 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={entry.isRedScale}
+                                onChange={(e) =>
+                                  updateDraftMeta(entry.date, { isRedScale: e.target.checked })
+                                }
+                                aria-label={`Escala vermelha em ${entry.date}`}
+                                className="accent-[#F87171]"
+                              />
+                              <input
+                                type="text"
+                                value={entry.holidayLabel}
+                                maxLength={BLUEPRINT_LIMITS.MAX_HOLIDAY_LEN}
+                                onChange={(e) =>
+                                  updateDraftMeta(entry.date, { holidayLabel: e.target.value })
+                                }
+                                placeholder="Feriado..."
+                                className="w-24 px-2 py-1 text-xs text-[#E4EAE6] placeholder:text-[#697870] bg-[#080B09]/70 border border-[#EBE0C8]/15 rounded-md focus:outline-none focus:border-[#C8A461]"
+                              />
+                            </div>
+                          </td>
+
+                          {selectedSchedule.columns.map((col) => (
+                            <td key={col.id} className="px-2 py-1.5 border-r border-[#EBE0C8]/8">
+                              <input
+                                type="text"
+                                value={entry.assignments[col.id] ?? ''}
+                                maxLength={BLUEPRINT_LIMITS.MAX_ASSIGNMENT_LEN}
+                                onChange={(e) =>
+                                  updateDraftCell(entry.date, col.id, e.target.value)
+                                }
+                                placeholder="—"
+                                aria-label={`${col.label} em ${entry.date}`}
+                                className="w-full min-h-[36px] px-2.5 py-1 text-xs sm:text-[13px] font-medium text-[#E4EAE6] placeholder:text-[#4F6056] bg-[#090F0C]/60 border border-transparent hover:border-[#EBE0C8]/22 focus:bg-[#080B09] focus:border-[#C8A461] focus:outline-none rounded-md transition-colors"
+                              />
+                            </td>
+                          ))}
+
+                          <td className="px-3 py-1.5 text-right whitespace-nowrap">
                             <button
                               type="button"
-                              title="Alterar data desta linha"
-                              onClick={() => {
-                                setRenamingEntry(entry);
-                                setNewDateValue(entry.date);
-                              }}
-                              className="p-1.5 text-[#5A665E] hover:text-[#141A16] rounded cursor-pointer"
-                              aria-label={`Alterar data ${entry.date}`}
+                              disabled={!isCloudSynced}
+                              onClick={() =>
+                                setConfirmAction({
+                                  title: 'Excluir registro diário',
+                                  description: `Tem certeza que deseja remover a data ${formatFullDatePt(entry.date)} da escala "${selectedSchedule.name}"? Esta ação será registrada no histórico.`,
+                                  confirmLabel: 'Excluir data',
+                                  onConfirm: async () => {
+                                    await deleteSingleEntry(
+                                      adminToken,
+                                      selectedSchedule,
+                                      entry.date
+                                    );
+                                    setFeedback({
+                                      type: 'success',
+                                      text: `Data ${formatShortDatePt(entry.date)} removida com sucesso.`,
+                                    });
+                                  },
+                                })
+                              }
+                              className="p-2 text-[#FCA5A5] hover:bg-[#7F1D1D]/35 disabled:opacity-35 rounded-lg transition-colors cursor-pointer"
+                              aria-label={`Excluir registro ${entry.date}`}
                             >
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
-                          </div>
-                        </td>
-
-                        <td className="px-3 py-2 border-r border-[#EEF1EE] whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={entry.isRedScale}
-                              onChange={(e) =>
-                                updateDraftMeta(entry.date, { isRedScale: e.target.checked })
-                              }
-                              aria-label={`Escala vermelha em ${entry.date}`}
-                              className="accent-[#B91C1C]"
-                            />
-                            <input
-                              type="text"
-                              value={entry.holidayLabel}
-                              maxLength={BLUEPRINT_LIMITS.MAX_HOLIDAY_LEN}
-                              onChange={(e) =>
-                                updateDraftMeta(entry.date, { holidayLabel: e.target.value })
-                              }
-                              placeholder="Feriado..."
-                              className="w-24 px-2 py-1 text-xs bg-white/80 border border-[#DCE1DC] rounded focus:outline-none focus:border-[#1B4332]"
-                            />
-                          </div>
-                        </td>
-
-                        {selectedSchedule.columns.map((col) => (
-                          <td key={col.id} className="px-2.5 py-1.5 border-r border-[#EEF1EE]">
-                            <input
-                              type="text"
-                              value={entry.assignments[col.id] ?? ''}
-                              maxLength={BLUEPRINT_LIMITS.MAX_ASSIGNMENT_LEN}
-                              onChange={(e) =>
-                                updateDraftCell(entry.date, col.id, e.target.value)
-                              }
-                              placeholder="—"
-                              aria-label={`${col.label} em ${entry.date}`}
-                              className="w-full min-h-[36px] px-2.5 py-1 text-xs sm:text-[13px] font-medium text-[#141A16] bg-white/80 border border-transparent hover:border-[#D4DBD5] focus:bg-white focus:border-[#1B4332] focus:outline-none rounded"
-                            />
                           </td>
-                        ))}
-
-                        <td className="px-3 py-1.5 text-right whitespace-nowrap">
-                          <button
-                            type="button"
-                            disabled={!isCloudSynced}
-                            onClick={() =>
-                              setConfirmAction({
-                                title: 'Excluir registro diário',
-                                description: `Tem certeza que deseja remover a data ${formatFullDatePt(entry.date)} da escala "${selectedSchedule.name}"? Esta ação será registrada no histórico.`,
-                                confirmLabel: 'Excluir data',
-                                onConfirm: async () => {
-                                  await deleteSingleEntry(adminToken, selectedSchedule, entry.date);
-                                  setFeedback({
-                                    type: 'success',
-                                    text: `Data ${formatShortDatePt(entry.date)} removida com sucesso.`,
-                                  });
-                                },
-                              })
-                            }
-                            className="p-2 text-[#B91C1C] hover:bg-[#FEF2F2] disabled:opacity-40 rounded-lg cursor-pointer"
-                            aria-label={`Excluir registro ${entry.date}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
 
-      {/* TAB 2: MODULAR SCHEDULE MODELS & COLUMNS MANAGER */}
-      {activeTab === 'models' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h2 className="font-display text-lg font-semibold text-[#141A16]">
-                Modelos de Escala Cadastrados ({schedules.length})
-              </h2>
-              <p className="text-xs text-[#5A665E]">
-                Adicione novas escalas ou personalize colunas e funções sem alterar os modelos existentes.
-              </p>
+        {/* TAB 2: MODULAR SCHEDULE MODELS & COLUMNS MANAGER */}
+        {activeTab === 'models' && (
+          <motion.div
+            key="tab-models"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+            className="space-y-4"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg font-semibold text-[#F4E6C4]">
+                  Modelos de Escala Cadastrados ({schedules.length})
+                </h2>
+                <p className="text-xs text-[#98A89F]">
+                  Adicione novas escalas ou personalize colunas e funções sem alterar os modelos existentes.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {isCloudSynced && missingBaseSchedulesCount > 0 && (
+                  <button
+                    type="button"
+                    disabled={Boolean(busyMessage)}
+                    onClick={() => void handleSyncMissingBaseSchedules()}
+                    className="btl-btn btl-btn-gold text-sm"
+                  >
+                    <CloudUpload className="w-4 h-4" />
+                    <span>Adicionar {missingBaseSchedulesCount} modelo(s) base</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={openCreateModelModal}
+                  className="btl-btn btl-btn-primary text-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Criar nova escala</span>
+                </button>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {isCloudSynced && missingBaseSchedulesCount > 0 && (
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {schedules.map((model) => {
+                const count = entriesBySchedule[model.id]?.length ?? 0;
+                return (
+                  <div
+                    key={model.id}
+                    className="btl-home-card p-5 flex flex-col justify-between gap-4"
+                  >
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between gap-2 text-xs text-[#98A89F] font-mono tabular-nums">
+                        <span className="text-[#E5C17B] font-semibold">
+                          Ordem #{model.order}
+                        </span>
+                        <span>
+                          {model.columns.length} colunas · {count} dias
+                        </span>
+                      </div>
+                      <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                        {model.name}
+                      </h3>
+                      {model.description && (
+                        <p className="text-xs text-[#98A89F] leading-relaxed">
+                          {model.description}
+                        </p>
+                      )}
+                      <div className="pt-2.5 border-t border-[#EBE0C8]/10 text-xs text-[#C8D4CD] leading-relaxed">
+                        {model.columns.map((c) => c.label).join(' · ')}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#EBE0C8]/10">
+                      <button
+                        type="button"
+                        onClick={() => openEditModelModal(model)}
+                        className="btl-btn btl-btn-secondary min-h-[38px] px-3.5 py-1.5 text-xs"
+                      >
+                        <Pencil className="w-3.5 h-3.5 text-[#E5C17B]" />
+                        <span>Editar modelo e colunas</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={!isCloudSynced}
+                        onClick={() =>
+                          setConfirmAction({
+                            title: 'Excluir modelo de escala',
+                            description: `Deseja excluir permanentemente a escala "${model.name}" e todos os seus ${count} registros diários?`,
+                            confirmLabel: 'Excluir escala',
+                            onConfirm: async () => {
+                              await deleteScheduleModel(adminToken, model);
+                              setFeedback({
+                                type: 'success',
+                                text: `Escala "${model.name}" removida com sucesso.`,
+                              });
+                            },
+                          })
+                        }
+                        className="btl-btn btl-btn-danger min-h-[38px] px-3 py-1.5 text-xs"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Excluir</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* TAB 3: AUDIT HISTORY */}
+        {activeTab === 'history' && (
+          <motion.div
+            key="tab-history"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+          >
+            <AuditHistoryView logs={auditLogs} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PREVIEW CHANGES BEFORE SAVING MODAL */}
+      <AnimatePresence>
+        {showPreviewModal && selectedSchedule && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_MICRO}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={SPRING_MODAL}
+              className="w-full max-w-2xl btl-modal overflow-hidden max-h-[85vh] flex flex-col"
+            >
+              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
+                <div>
+                  <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                    Pré-visualização das Alterações
+                  </h3>
+                  <p className="text-xs text-[#98A89F]">
+                    {selectedSchedule.name} · {pendingDiffs.length} alteração(ões) pronta(s) para publicar
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="p-1.5 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 overflow-y-auto flex-1 divide-y divide-[#EBE0C8]/10">
+                {pendingDiffs.map((diff, i) => (
+                  <div
+                    key={`${diff.date}-${diff.fieldLabel}-${i}`}
+                    className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm"
+                  >
+                    <div>
+                      <span className="font-mono text-xs font-semibold text-[#F4E6C4] tabular-nums">
+                        {formatShortDatePt(diff.date)}
+                      </span>
+                      <span className="mx-2 text-[#697870]">·</span>
+                      <span className="text-xs font-medium text-[#98A89F]">{diff.fieldLabel}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs sm:text-sm">
+                      <span className="text-[#FCA5A5] line-through">{diff.before}</span>
+                      <span className="text-[#697870]">→</span>
+                      <span className="font-semibold text-[#A8D8BE]">{diff.after}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPreviewModal(false)}
+                  className="btl-btn btl-btn-secondary text-sm"
+                >
+                  Voltar e revisar
+                </button>
                 <button
                   type="button"
                   disabled={Boolean(busyMessage)}
-                  onClick={() => void handleSyncMissingBaseSchedules()}
-                  className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-[#1B4332] bg-[#ECF6F0] hover:bg-[#DCEEE3] border border-[#1B4332]/25 disabled:opacity-60 rounded-lg whitespace-nowrap cursor-pointer"
+                  onClick={() => void handleCommitDraftChanges()}
+                  className="btl-btn btl-btn-primary text-sm px-5"
                 >
-                  <CloudUpload className="w-4 h-4" />
-                  <span>Adicionar {missingBaseSchedulesCount} modelo(s) base</span>
+                  <Save className="w-4 h-4" />
+                  <span>{busyMessage ? 'Publicando...' : 'Confirmar e publicar'}</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={openCreateModelModal}
-                className="inline-flex items-center justify-center gap-2 min-h-[42px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg whitespace-nowrap cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Criar nova escala</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {schedules.map((model) => {
-              const count = entriesBySchedule[model.id]?.length ?? 0;
-              return (
-                <div
-                  key={model.id}
-                  className="bg-white border border-[#DCE1DC] rounded-xl p-5 flex flex-col justify-between gap-4"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-center justify-between gap-2 text-xs text-[#5A665E] font-mono tabular-nums">
-                      <span>Ordem #{model.order}</span>
-                      <span>
-                        {model.columns.length} colunas · {count} dias
-                      </span>
-                    </div>
-                    <h3 className="font-display text-base font-semibold text-[#141A16]">
-                      {model.name}
-                    </h3>
-                    {model.description && (
-                      <p className="text-xs text-[#4A554E] leading-relaxed">
-                        {model.description}
-                      </p>
-                    )}
-                    <div className="pt-2 border-t border-[#EEF1EE] text-xs text-[#2A352E]">
-                      {model.columns.map((c) => c.label).join(' · ')}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#EEF1EE]">
-                    <button
-                      type="button"
-                      onClick={() => openEditModelModal(model)}
-                      className="inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs font-medium text-[#141A16] bg-[#F2F4F2] hover:bg-[#E4E9E5] rounded-lg cursor-pointer"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      <span>Editar modelo e colunas</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={!isCloudSynced}
-                      onClick={() =>
-                        setConfirmAction({
-                          title: 'Excluir modelo de escala',
-                          description: `Deseja excluir permanentemente a escala "${model.name}" e todos os seus ${count} registros diários?`,
-                          confirmLabel: 'Excluir escala',
-                          onConfirm: async () => {
-                            await deleteScheduleModel(adminToken, model);
-                            setFeedback({
-                              type: 'success',
-                              text: `Escala "${model.name}" removida com sucesso.`,
-                            });
-                          },
-                        })
-                      }
-                      className="inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 text-xs font-medium text-[#B91C1C] hover:bg-[#FEF2F2] disabled:opacity-40 rounded-lg cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Excluir</span>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: AUDIT HISTORY */}
-      {activeTab === 'history' && <AuditHistoryView logs={auditLogs} />}
-
-      {/* PREVIEW CHANGES BEFORE SAVING MODAL */}
-      {showPreviewModal && selectedSchedule && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-2xl bg-white border border-[#DCE1DC] rounded-xl overflow-hidden shadow-xl max-h-[85vh] flex flex-col">
-            <div className="px-6 py-4 bg-[#16201A] text-white flex items-center justify-between">
-              <div>
-                <h3 className="font-display text-base font-semibold">
-                  Pré-visualização das Alterações
-                </h3>
-                <p className="text-xs text-[#C6D1C9]">
-                  {selectedSchedule.name} · {pendingDiffs.length} alteração(ões) pronta(s) para publicar
-                </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="p-1.5 text-white/75 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-5 overflow-y-auto flex-1 divide-y divide-[#EEF1EE]">
-              {pendingDiffs.map((diff, i) => (
-                <div
-                  key={`${diff.date}-${diff.fieldLabel}-${i}`}
-                  className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm"
-                >
-                  <div>
-                    <span className="font-mono text-xs font-semibold text-[#141A16] tabular-nums">
-                      {formatShortDatePt(diff.date)}
-                    </span>
-                    <span className="mx-2 text-[#9AA69D]">·</span>
-                    <span className="text-xs font-medium text-[#5A665E]">{diff.fieldLabel}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs sm:text-sm">
-                    <span className="text-[#991B1B] line-through">{diff.before}</span>
-                    <span className="text-[#5A665E]">→</span>
-                    <span className="font-semibold text-[#1B4332]">{diff.after}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="px-6 py-4 bg-[#F7F8F7] border-t border-[#E2E6E2] flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="min-h-[42px] px-4 py-2 text-sm font-medium text-[#4A554E] hover:text-[#141A16] cursor-pointer"
-              >
-                Voltar e revisar
-              </button>
-              <button
-                type="button"
-                disabled={Boolean(busyMessage)}
-                onClick={() => void handleCommitDraftChanges()}
-                className="inline-flex items-center gap-2 min-h-[42px] px-5 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] disabled:opacity-60 rounded-lg cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>{busyMessage ? 'Publicando...' : 'Confirmar e publicar'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* CREATE NEW PERIOD MODAL */}
-      {showPeriodModal && selectedSchedule && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <form
-            onSubmit={handleCreatePeriod}
-            className="w-full max-w-md bg-white border border-[#DCE1DC] rounded-xl overflow-hidden shadow-xl"
+      <AnimatePresence>
+        {showPeriodModal && selectedSchedule && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_MICRO}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="px-6 py-4 bg-[#16201A] text-white flex items-center justify-between">
-              <h3 className="font-display text-base font-semibold">Criar Novo Período</h3>
-              <button
-                type="button"
-                onClick={() => setShowPeriodModal(false)}
-                className="p-1 text-white/75 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-[#4A554E]">
-                As novas datas serão adicionadas à escala <strong>{selectedSchedule.name}</strong> sem sobrescrever dias já existentes. Sábados e domingos já vêm marcados como escala vermelha.
-              </p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="space-y-1 text-xs font-semibold text-[#2A352E]">
-                  <span>Data inicial</span>
-                  <input
-                    type="date"
-                    required
-                    value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm font-mono bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                  />
-                </label>
-                <label className="space-y-1 text-xs font-semibold text-[#2A352E]">
-                  <span>Data final</span>
-                  <input
-                    type="date"
-                    required
-                    value={periodEnd}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
-                    className="w-full min-h-[42px] px-3 py-2 text-sm font-mono bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                  />
-                </label>
+            <motion.form
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={SPRING_MODAL}
+              onSubmit={handleCreatePeriod}
+              className="w-full max-w-md btl-modal overflow-hidden"
+            >
+              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                  Criar Novo Período
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowPeriodModal(false)}
+                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-            </div>
 
-            <div className="px-6 py-4 bg-[#F7F8F7] border-t border-[#E2E6E2] flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setShowPeriodModal(false)}
-                className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#4A554E] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={Boolean(busyMessage)}
-                className="min-h-[40px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg cursor-pointer"
-              >
-                Gerar datas
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+              <div className="p-6 space-y-4">
+                <p className="text-xs text-[#98A89F] leading-relaxed">
+                  As novas datas serão adicionadas à escala{' '}
+                  <strong className="text-[#E5C17B]">{selectedSchedule.name}</strong> sem sobrescrever dias já existentes. Sábados e domingos já vêm marcados como escala vermelha.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1 text-xs font-semibold text-[#C8D4CD]">
+                    <span>Data inicial</span>
+                    <input
+                      type="date"
+                      required
+                      value={periodStart}
+                      onChange={(e) => setPeriodStart(e.target.value)}
+                      className="btl-input px-3 py-2 font-mono"
+                    />
+                  </label>
+                  <label className="space-y-1 text-xs font-semibold text-[#C8D4CD]">
+                    <span>Data final</span>
+                    <input
+                      type="date"
+                      required
+                      value={periodEnd}
+                      onChange={(e) => setPeriodEnd(e.target.value)}
+                      className="btl-input px-3 py-2 font-mono"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowPeriodModal(false)}
+                  className="btl-btn btl-btn-secondary text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={Boolean(busyMessage)}
+                  className="btl-btn btl-btn-primary text-sm"
+                >
+                  Gerar datas
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* RENAME ENTRY DATE MODAL */}
-      {renamingEntry && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <form
-            onSubmit={handleConfirmRenameDate}
-            className="w-full max-w-sm bg-white border border-[#DCE1DC] rounded-xl overflow-hidden shadow-xl"
+      <AnimatePresence>
+        {renamingEntry && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_MICRO}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
           >
-            <div className="px-6 py-4 bg-[#16201A] text-white flex items-center justify-between">
-              <h3 className="font-display text-base font-semibold">Alterar Data do Registro</h3>
-              <button
-                type="button"
-                onClick={() => setRenamingEntry(null)}
-                className="p-1 text-white/75 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-[#4A554E]">
-                Data atual: <strong className="font-mono">{formatFullDatePt(renamingEntry.date)}</strong>
-              </p>
-              <label className="block space-y-1 text-xs font-semibold text-[#2A352E]">
-                <span>Nova data</span>
-                <input
-                  type="date"
-                  required
-                  value={newDateValue}
-                  onChange={(e) => setNewDateValue(e.target.value)}
-                  className="w-full min-h-[42px] px-3 py-2 text-sm font-mono bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                />
-              </label>
-            </div>
-            <div className="px-6 py-4 bg-[#F7F8F7] border-t border-[#E2E6E2] flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setRenamingEntry(null)}
-                className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#4A554E] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={Boolean(busyMessage)}
-                className="min-h-[40px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg cursor-pointer"
-              >
-                Salvar data
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* CREATE / EDIT SCHEDULE MODEL MODAL */}
-      {editingModel && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <form
-            onSubmit={handleSaveModel}
-            className="w-full max-w-2xl bg-white border border-[#DCE1DC] rounded-xl overflow-hidden shadow-xl max-h-[90vh] flex flex-col"
-          >
-            <div className="px-6 py-4 bg-[#16201A] text-white flex items-center justify-between">
-              <h3 className="font-display text-base font-semibold">
-                {editingModel.mode === 'create'
-                  ? 'Cadastrar Novo Modelo de Escala'
-                  : 'Editar Modelo e Colunas da Escala'}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setEditingModel(null)}
-                className="p-1 text-white/75 hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto flex-1 space-y-5">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label className="sm:col-span-2 space-y-1 text-xs font-semibold text-[#2A352E]">
-                  <span>Nome da escala</span>
+            <motion.form
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={SPRING_MODAL}
+              onSubmit={handleConfirmRenameDate}
+              className="w-full max-w-sm btl-modal overflow-hidden"
+            >
+              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                  Alterar Data do Registro
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setRenamingEntry(null)}
+                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <p className="text-xs text-[#98A89F]">
+                  Data atual:{' '}
+                  <strong className="font-mono text-[#E5C17B]">
+                    {formatFullDatePt(renamingEntry.date)}
+                  </strong>
+                </p>
+                <label className="block space-y-1 text-xs font-semibold text-[#C8D4CD]">
+                  <span>Nova data</span>
                   <input
-                    type="text"
+                    type="date"
                     required
-                    minLength={2}
-                    maxLength={BLUEPRINT_LIMITS.MAX_NAME_LEN}
-                    value={editingModel.name}
-                    onChange={(e) => setEditingModel({ ...editingModel, name: e.target.value })}
-                    placeholder="Ex: Auxiliares e Supervisores"
-                    className="w-full min-h-[42px] px-3 py-2 text-sm font-normal bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
+                    value={newDateValue}
+                    onChange={(e) => setNewDateValue(e.target.value)}
+                    className="btl-input px-3 py-2 font-mono"
                   />
                 </label>
-                <label className="space-y-1 text-xs font-semibold text-[#2A352E]">
-                  <span>Sigla / Ordem</span>
-                  <div className="flex gap-2">
+              </div>
+              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setRenamingEntry(null)}
+                  className="btl-btn btl-btn-secondary text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={Boolean(busyMessage)}
+                  className="btl-btn btl-btn-primary text-sm"
+                >
+                  Salvar data
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CREATE / EDIT SCHEDULE MODEL MODAL */}
+      <AnimatePresence>
+        {editingModel && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_MICRO}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <motion.form
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={SPRING_MODAL}
+              onSubmit={handleSaveModel}
+              className="w-full max-w-2xl btl-modal overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                  {editingModel.mode === 'create'
+                    ? 'Cadastrar Novo Modelo de Escala'
+                    : 'Editar Modelo e Colunas da Escala'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setEditingModel(null)}
+                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 overflow-y-auto flex-1 space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <label className="sm:col-span-2 space-y-1 text-xs font-semibold text-[#C8D4CD]">
+                    <span>Nome da escala</span>
                     <input
                       type="text"
-                      maxLength={BLUEPRINT_LIMITS.MAX_SHORT_CODE_LEN}
-                      value={editingModel.shortCode}
-                      onChange={(e) =>
-                        setEditingModel({ ...editingModel, shortCode: e.target.value })
-                      }
-                      placeholder="Sigla"
-                      className="w-full min-h-[42px] px-2.5 py-2 text-sm font-normal bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
+                      required
+                      minLength={2}
+                      maxLength={BLUEPRINT_LIMITS.MAX_NAME_LEN}
+                      value={editingModel.name}
+                      onChange={(e) => setEditingModel({ ...editingModel, name: e.target.value })}
+                      placeholder="Ex: Auxiliares e Supervisores"
+                      className="btl-input px-3 py-2 font-normal"
                     />
-                    <input
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={editingModel.order}
-                      onChange={(e) =>
-                        setEditingModel({ ...editingModel, order: Number(e.target.value) })
-                      }
-                      className="w-16 min-h-[42px] px-2 py-2 text-sm font-mono bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                    />
-                  </div>
-                </label>
-              </div>
-
-              <label className="block space-y-1 text-xs font-semibold text-[#2A352E]">
-                <span>Descrição (opcional)</span>
-                <input
-                  type="text"
-                  maxLength={BLUEPRINT_LIMITS.MAX_DESC_LEN}
-                  value={editingModel.description}
-                  onChange={(e) =>
-                    setEditingModel({ ...editingModel, description: e.target.value })
-                  }
-                  placeholder="Breve descrição da finalidade desta planilha..."
-                  className="w-full min-h-[40px] px-3 py-2 text-sm font-normal bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                />
-              </label>
-
-              {/* Dynamic Columns Builder */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[#2A352E]">
-                    Funções e Colunas ({editingModel.columns.length}/{BLUEPRINT_LIMITS.MAX_COLUMNS})
-                  </span>
-                  <button
-                    type="button"
-                    disabled={editingModel.columns.length >= BLUEPRINT_LIMITS.MAX_COLUMNS}
-                    onClick={() =>
-                      setEditingModel({
-                        ...editingModel,
-                        columns: [
-                          ...editingModel.columns,
-                          {
-                            id: `col_${Date.now().toString(36)}`,
-                            label: '',
-                            kind: 'secondary',
-                          },
-                        ],
-                      })
-                    }
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#1B4332] hover:underline disabled:opacity-40 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Adicionar coluna</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  {editingModel.columns.map((col, idx) => (
-                    <div key={col.id} className="flex items-center gap-2">
+                  </label>
+                  <label className="space-y-1 text-xs font-semibold text-[#C8D4CD]">
+                    <span>Sigla / Ordem</span>
+                    <div className="flex gap-2">
                       <input
                         type="text"
-                        required
-                        maxLength={64}
-                        value={col.label}
-                        onChange={(e) => {
-                          const next = [...editingModel.columns];
-                          next[idx] = { ...next[idx], label: e.target.value };
-                          setEditingModel({ ...editingModel, columns: next });
-                        }}
-                        placeholder={`Nome exato do cabeçalho #${idx + 1}`}
-                        className="flex-1 min-h-[40px] px-3 py-1.5 text-sm bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                      />
-                      <select
-                        value={col.kind}
-                        onChange={(e) => {
-                          const next = [...editingModel.columns];
-                          next[idx] = { ...next[idx], kind: e.target.value as ColumnKind };
-                          setEditingModel({ ...editingModel, columns: next });
-                        }}
-                        className="min-h-[40px] px-2.5 py-1.5 text-xs bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                      >
-                        <option value="primary">Principal</option>
-                        <option value="secondary">Função / Grupo</option>
-                        <option value="reference">Ref / Substituição</option>
-                      </select>
-
-                      <button
-                        type="button"
-                        disabled={idx === 0}
-                        onClick={() => {
-                          const next = [...editingModel.columns];
-                          [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                          setEditingModel({ ...editingModel, columns: next });
-                        }}
-                        className="p-2 text-[#5A665E] hover:text-[#141A16] disabled:opacity-30 cursor-pointer"
-                        aria-label="Mover para cima"
-                      >
-                        <ArrowUp className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={idx === editingModel.columns.length - 1}
-                        onClick={() => {
-                          const next = [...editingModel.columns];
-                          [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
-                          setEditingModel({ ...editingModel, columns: next });
-                        }}
-                        className="p-2 text-[#5A665E] hover:text-[#141A16] disabled:opacity-30 cursor-pointer"
-                        aria-label="Mover para baixo"
-                      >
-                        <ArrowDown className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        disabled={editingModel.columns.length <= 1}
-                        onClick={() =>
-                          setEditingModel({
-                            ...editingModel,
-                            columns: editingModel.columns.filter((_, i) => i !== idx),
-                          })
+                        maxLength={BLUEPRINT_LIMITS.MAX_SHORT_CODE_LEN}
+                        value={editingModel.shortCode}
+                        onChange={(e) =>
+                          setEditingModel({ ...editingModel, shortCode: e.target.value })
                         }
-                        className="p-2 text-[#B91C1C] hover:bg-[#FEF2F2] disabled:opacity-30 rounded cursor-pointer"
-                        aria-label="Remover coluna"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                        placeholder="Sigla"
+                        className="btl-input px-2.5 py-2 font-normal"
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={editingModel.order}
+                        onChange={(e) =>
+                          setEditingModel({ ...editingModel, order: Number(e.target.value) })
+                        }
+                        className="btl-input w-16 shrink-0 px-2 py-2 font-mono"
+                      />
                     </div>
-                  ))}
+                  </label>
                 </div>
-              </div>
 
-              {editingModel.mode === 'create' && (
-                <div className="pt-3 border-t border-[#EEF1EE] space-y-2">
-                  <span className="text-xs font-semibold text-[#2A352E]">
-                    Período inicial de datas (opcional)
-                  </span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="date"
-                      value={editingModel.initialStart}
-                      onChange={(e) =>
-                        setEditingModel({ ...editingModel, initialStart: e.target.value })
+                <label className="block space-y-1 text-xs font-semibold text-[#C8D4CD]">
+                  <span>Descrição (opcional)</span>
+                  <input
+                    type="text"
+                    maxLength={BLUEPRINT_LIMITS.MAX_DESC_LEN}
+                    value={editingModel.description}
+                    onChange={(e) =>
+                      setEditingModel({ ...editingModel, description: e.target.value })
+                    }
+                    placeholder="Breve descrição da finalidade desta planilha..."
+                    className="btl-input px-3 py-2 font-normal"
+                  />
+                </label>
+
+                {/* Dynamic Columns Builder */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-[#C8D4CD]">
+                      Funções e Colunas ({editingModel.columns.length}/{BLUEPRINT_LIMITS.MAX_COLUMNS})
+                    </span>
+                    <button
+                      type="button"
+                      disabled={editingModel.columns.length >= BLUEPRINT_LIMITS.MAX_COLUMNS}
+                      onClick={() =>
+                        setEditingModel({
+                          ...editingModel,
+                          columns: [
+                            ...editingModel.columns,
+                            {
+                              id: `col_${Date.now().toString(36)}`,
+                              label: '',
+                              kind: 'secondary',
+                            },
+                          ],
+                        })
                       }
-                      className="min-h-[40px] px-3 py-1.5 text-sm font-mono bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                    />
-                    <input
-                      type="date"
-                      value={editingModel.initialEnd}
-                      onChange={(e) =>
-                        setEditingModel({ ...editingModel, initialEnd: e.target.value })
-                      }
-                      className="min-h-[40px] px-3 py-1.5 text-sm font-mono bg-[#F7F8F7] border border-[#D4DBD5] rounded-lg"
-                    />
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[#E5C17B] hover:text-[#F4E6C4] hover:underline disabled:opacity-40 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Adicionar coluna</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {editingModel.columns.map((col, idx) => (
+                      <div key={col.id} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          required
+                          maxLength={64}
+                          value={col.label}
+                          onChange={(e) => {
+                            const next = [...editingModel.columns];
+                            next[idx] = { ...next[idx], label: e.target.value };
+                            setEditingModel({ ...editingModel, columns: next });
+                          }}
+                          placeholder={`Nome exato do cabeçalho #${idx + 1}`}
+                          className="btl-input flex-1 min-h-[40px] px-3 py-1.5"
+                        />
+                        <select
+                          value={col.kind}
+                          onChange={(e) => {
+                            const next = [...editingModel.columns];
+                            next[idx] = { ...next[idx], kind: e.target.value as ColumnKind };
+                            setEditingModel({ ...editingModel, columns: next });
+                          }}
+                          className="btl-select w-auto min-h-[40px] px-2.5 py-1.5 text-xs"
+                        >
+                          <option value="primary">Principal</option>
+                          <option value="secondary">Função / Grupo</option>
+                          <option value="reference">Ref / Substituição</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            const next = [...editingModel.columns];
+                            [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                            setEditingModel({ ...editingModel, columns: next });
+                          }}
+                          className="p-2 text-[#98A89F] hover:text-[#F4E6C4] disabled:opacity-30 cursor-pointer"
+                          aria-label="Mover para cima"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === editingModel.columns.length - 1}
+                          onClick={() => {
+                            const next = [...editingModel.columns];
+                            [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
+                            setEditingModel({ ...editingModel, columns: next });
+                          }}
+                          className="p-2 text-[#98A89F] hover:text-[#F4E6C4] disabled:opacity-30 cursor-pointer"
+                          aria-label="Mover para baixo"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={editingModel.columns.length <= 1}
+                          onClick={() =>
+                            setEditingModel({
+                              ...editingModel,
+                              columns: editingModel.columns.filter((_, i) => i !== idx),
+                            })
+                          }
+                          className="p-2 text-[#FCA5A5] hover:bg-[#7F1D1D]/35 disabled:opacity-30 rounded-lg cursor-pointer"
+                          aria-label="Remover coluna"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              )}
-            </div>
 
-            <div className="px-6 py-4 bg-[#F7F8F7] border-t border-[#E2E6E2] flex justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setEditingModel(null)}
-                className="min-h-[42px] px-4 py-2 text-sm font-medium text-[#4A554E] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                disabled={Boolean(busyMessage)}
-                className="min-h-[42px] px-5 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] disabled:opacity-60 rounded-lg cursor-pointer"
-              >
-                {editingModel.mode === 'create' ? 'Criar escala' : 'Salvar estrutura'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+                {editingModel.mode === 'create' && (
+                  <div className="pt-3 border-t border-[#EBE0C8]/10 space-y-2">
+                    <span className="text-xs font-semibold text-[#C8D4CD]">
+                      Período inicial de datas (opcional)
+                    </span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input
+                        type="date"
+                        value={editingModel.initialStart}
+                        onChange={(e) =>
+                          setEditingModel({ ...editingModel, initialStart: e.target.value })
+                        }
+                        className="btl-input min-h-[40px] px-3 py-1.5 font-mono"
+                      />
+                      <input
+                        type="date"
+                        value={editingModel.initialEnd}
+                        onChange={(e) =>
+                          setEditingModel({ ...editingModel, initialEnd: e.target.value })
+                        }
+                        className="btl-input min-h-[40px] px-3 py-1.5 font-mono"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingModel(null)}
+                  className="btl-btn btl-btn-secondary text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={Boolean(busyMessage)}
+                  className="btl-btn btl-btn-primary text-sm px-5"
+                >
+                  {editingModel.mode === 'create' ? 'Criar escala' : 'Salvar estrutura'}
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* DESTRUCTIVE CONFIRMATION MODAL (No window.confirm!) */}
-      {confirmAction && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="w-full max-w-md bg-white border border-[#DCE1DC] rounded-xl p-6 space-y-4 shadow-xl">
-            <h3 className="font-display text-base font-semibold text-[#141A16]">
-              {confirmAction.title}
-            </h3>
-            <p className="text-sm text-[#4A554E] leading-relaxed">{confirmAction.description}</p>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmAction(null)}
-                className="min-h-[40px] px-4 py-2 text-sm font-medium text-[#4A554E] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={Boolean(busyMessage)}
-                onClick={async () => {
-                  const fn = confirmAction.onConfirm;
-                  setConfirmAction(null);
-                  setBusyMessage('Executando exclusão...');
-                  try {
-                    await fn();
-                  } catch (err) {
-                    handleActionError(err);
-                  } finally {
-                    setBusyMessage('');
-                  }
-                }}
-                className="min-h-[40px] px-4 py-2 text-sm font-medium text-white bg-[#B91C1C] hover:bg-[#991B1B] rounded-lg cursor-pointer"
-              >
-                {confirmAction.confirmLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {confirmAction && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_MICRO}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={SPRING_MODAL}
+              className="w-full max-w-md btl-modal p-6 space-y-4"
+            >
+              <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                {confirmAction.title}
+              </h3>
+              <p className="text-sm text-[#98A89F] leading-relaxed">{confirmAction.description}</p>
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmAction(null)}
+                  className="btl-btn btl-btn-secondary text-sm"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={Boolean(busyMessage)}
+                  onClick={async () => {
+                    const fn = confirmAction.onConfirm;
+                    setConfirmAction(null);
+                    setBusyMessage('Executando exclusão...');
+                    try {
+                      await fn();
+                    } catch (err) {
+                      handleActionError(err);
+                    } finally {
+                      setBusyMessage('');
+                    }
+                  }}
+                  className="btl-btn btl-btn-danger text-sm"
+                >
+                  {confirmAction.confirmLabel}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Subtle Bottom Action Bar to Exit Admin */}
       <div className="flex justify-end pt-2">
         <button
           type="button"
           onClick={onExitAdmin}
-          className="text-xs font-medium text-[#5A665E] hover:text-[#B91C1C] underline underline-offset-4 cursor-pointer"
+          className="text-xs font-medium text-[#98A89F] hover:text-[#FCA5A5] underline underline-offset-4 transition-colors cursor-pointer"
         >
           Encerrar sessão administrativa e voltar para consulta
         </button>

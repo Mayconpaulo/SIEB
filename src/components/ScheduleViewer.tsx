@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   CalendarDays,
   ChevronLeft,
@@ -8,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatFullDatePt, formatShortDatePt } from '../data/initialSchedules';
+import { SPRING_TAB, TRANSITION_VIEW, VIEW_VARIANTS } from '../lib/motion';
 import type { ScheduleEntry, ScheduleModel } from '../types/schedule';
 
 interface ScheduleViewerProps {
@@ -32,7 +34,7 @@ function normalizeText(value: string): string {
 function renderAssignmentValue(raw: string, highlightTerm: string): React.ReactNode {
   const trimmed = raw.trim();
   if (!trimmed) {
-    return <span className="text-[#B8C2BA] select-none">—</span>;
+    return <span className="text-[#4F6056] select-none">—</span>;
   }
 
   // Detect substitution notation like "BENACE (LUIS CLAUDIO)" or "* ALBUQUERQUE (MALTA - GUEs)"
@@ -40,7 +42,7 @@ function renderAssignmentValue(raw: string, highlightTerm: string): React.ReactN
   const isMatch = highlightTerm.length > 0 && normalizeText(trimmed).includes(highlightTerm);
 
   const highlightClass = isMatch
-    ? 'bg-[#FEF08A] text-[#141A16] px-1 -mx-1 rounded'
+    ? 'bg-[#C8A461]/30 text-[#F4E6C4] ring-1 ring-[#E5C17B]/40 px-1.5 py-0.5 -mx-1 rounded'
     : '';
 
   if (parenMatch) {
@@ -48,13 +50,13 @@ function renderAssignmentValue(raw: string, highlightTerm: string): React.ReactN
     const subNote = parenMatch[2].trim();
     return (
       <span className={`inline-flex flex-wrap items-baseline gap-x-1.5 ${highlightClass}`}>
-        <span className="font-semibold text-[#141A16]">{mainName}</span>
-        <span className="text-xs font-medium text-[#4A554E]">{subNote}</span>
+        <span className="font-semibold text-[#E4EAE6]">{mainName}</span>
+        <span className="text-xs font-medium text-[#98A89F]">{subNote}</span>
       </span>
     );
   }
 
-  return <span className={`font-semibold text-[#141A16] ${highlightClass}`}>{trimmed}</span>;
+  return <span className={`font-semibold text-[#E4EAE6] ${highlightClass}`}>{trimmed}</span>;
 }
 
 export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
@@ -132,9 +134,9 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
   if (!selectedSchedule) {
     return (
-      <div className="bg-white border border-[#DCE1DC] rounded-xl p-10 text-center space-y-2">
-        <p className="text-base font-semibold text-[#141A16]">Nenhuma escala cadastrada</p>
-        <p className="text-sm text-[#5A665E]">
+      <div className="btl-card p-10 text-center space-y-2">
+        <p className="text-base font-semibold text-[#F4E6C4]">Nenhuma escala cadastrada</p>
+        <p className="text-sm text-[#98A89F]">
           Acesse a Área Administrativa para cadastrar a primeira escala de serviço.
         </p>
       </div>
@@ -143,10 +145,10 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Schedule Model Switcher (scales smoothly to 6+ spreadsheets) */}
+      {/* Schedule Model Switcher (scales smoothly to 6+ spreadsheets with spring tab slide) */}
       <div className="space-y-4">
         <div
-          className="flex items-center gap-2 overflow-x-auto pb-1 schedule-scroll"
+          className="btl-tab-track flex items-center gap-1 overflow-x-auto schedule-scroll"
           role="tablist"
           aria-label="Selecionar modelo de escala"
         >
@@ -159,13 +161,18 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                 role="tab"
                 aria-selected={active}
                 onClick={() => onSelectSchedule(s.id)}
-                className={`min-h-[42px] px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
-                  active
-                    ? 'bg-[#16201A] text-white'
-                    : 'bg-white text-[#3E4841] border border-[#DCE1DC] hover:border-[#1B4332]/40 hover:text-[#141A16]'
+                className={`relative min-h-[40px] px-4 py-2 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                  active ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
                 }`}
               >
-                {s.name}
+                {active && (
+                  <motion.span
+                    layoutId="viewer-schedule-tab"
+                    transition={SPRING_TAB}
+                    className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/22 to-[#2D5A43]/34 border border-[#C8A461]/45 shadow-[inset_0_1px_0_rgba(255,250,236,0.22)]"
+                  />
+                )}
+                <span className="relative z-10">{s.name}</span>
               </button>
             );
           })}
@@ -173,20 +180,23 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="font-display text-xl sm:text-2xl font-bold text-[#141A16]">
+            <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F4E6C4]">
               {selectedSchedule.name}
             </h1>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#5A665E]">
-              <span className="tabular-nums">{selectedSchedule.columns.length} funções</span>
-              <span aria-hidden="true">·</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#98A89F]">
+              <span className="tabular-nums text-[#E5C17B] font-medium">
+                {selectedSchedule.columns.length} funções
+              </span>
+              <span aria-hidden="true" className="text-[#697870]">·</span>
               <span className="tabular-nums">
                 {filteredEntries.length} de {entries.length} dias exibidos
               </span>
               {entries.length > 0 && (
                 <>
-                  <span aria-hidden="true">·</span>
+                  <span aria-hidden="true" className="text-[#697870]">·</span>
                   <span className="font-mono tabular-nums">
-                    {formatShortDatePt(entries[0].date)} – {formatShortDatePt(entries[entries.length - 1].date)}
+                    {formatShortDatePt(entries[0].date)} –{' '}
+                    {formatShortDatePt(entries[entries.length - 1].date)}
                   </span>
                 </>
               )}
@@ -195,55 +205,69 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
           {/* View Mode Segmented Switcher */}
           <div
-            className="inline-flex items-center p-1 bg-[#E9EDE9] rounded-lg self-start md:self-auto shrink-0"
+            className="btl-tab-track inline-flex items-center gap-1 self-start md:self-auto shrink-0"
             role="group"
             aria-label="Modo de visualização"
           >
             <button
               type="button"
               onClick={() => onChangeViewMode('table')}
-              className={`inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${
+              className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                 viewMode === 'table'
-                  ? 'bg-white text-[#141A16] shadow-xs'
-                  : 'text-[#4A554E] hover:text-[#141A16]'
+                  ? 'text-[#F4E6C4]'
+                  : 'text-[#98A89F] hover:text-[#E4EAE6]'
               }`}
             >
-              <Table2 className="w-4 h-4" />
-              <span>Modo Tabela</span>
+              {viewMode === 'table' && (
+                <motion.span
+                  layoutId="viewer-mode-tab"
+                  transition={SPRING_TAB}
+                  className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#2D5A43]/75 to-[#1E3F2E]/85 border border-[#83B499]/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+                />
+              )}
+              <Table2 className="w-4 h-4 relative z-10" />
+              <span className="relative z-10">Modo Tabela</span>
             </button>
             <button
               type="button"
               onClick={() => onChangeViewMode('daily')}
-              className={`inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${
+              className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                 viewMode === 'daily'
-                  ? 'bg-white text-[#141A16] shadow-xs'
-                  : 'text-[#4A554E] hover:text-[#141A16]'
+                  ? 'text-[#F4E6C4]'
+                  : 'text-[#98A89F] hover:text-[#E4EAE6]'
               }`}
             >
-              <CalendarDays className="w-4 h-4" />
-              <span>Modo Diário</span>
+              {viewMode === 'daily' && (
+                <motion.span
+                  layoutId="viewer-mode-tab"
+                  transition={SPRING_TAB}
+                  className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#2D5A43]/75 to-[#1E3F2E]/85 border border-[#83B499]/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+                />
+              )}
+              <CalendarDays className="w-4 h-4 relative z-10" />
+              <span className="relative z-10">Modo Diário</span>
             </button>
           </div>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white border border-[#DCE1DC] rounded-xl p-4 flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+      <div className="btl-panel p-4 flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 text-[#6B776F] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Filtrar por nome de militar, substituto ou dia..."
             aria-label="Filtrar escala"
-            className="w-full min-h-[42px] pl-10 pr-9 py-2 text-sm bg-[#F7F8F7] border border-[#DCE1DC] rounded-lg text-[#141A16] placeholder:text-[#7A877E] focus:bg-white focus:outline-none focus:border-[#1B4332]"
+            className="btl-input pl-10 pr-9 py-2"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#6B776F] hover:text-[#141A16] cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
               aria-label="Limpar busca"
             >
               <X className="w-4 h-4" />
@@ -252,29 +276,29 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
         </div>
 
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
-          <label className="flex items-center gap-1.5 text-xs text-[#5A665E] flex-1 sm:flex-initial">
+          <label className="flex items-center gap-1.5 text-xs text-[#98A89F] flex-1 sm:flex-initial">
             <span className="shrink-0">De</span>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="w-full sm:w-auto min-h-[42px] px-2.5 py-1.5 text-xs sm:text-sm font-mono tabular-nums bg-[#F7F8F7] border border-[#DCE1DC] rounded-lg text-[#141A16] focus:bg-white focus:outline-none focus:border-[#1B4332]"
+              className="btl-input sm:w-auto px-2.5 py-1.5 text-xs sm:text-sm font-mono tabular-nums"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-xs text-[#5A665E] flex-1 sm:flex-initial">
+          <label className="flex items-center gap-1.5 text-xs text-[#98A89F] flex-1 sm:flex-initial">
             <span className="shrink-0">Até</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="w-full sm:w-auto min-h-[42px] px-2.5 py-1.5 text-xs sm:text-sm font-mono tabular-nums bg-[#F7F8F7] border border-[#DCE1DC] rounded-lg text-[#141A16] focus:bg-white focus:outline-none focus:border-[#1B4332]"
+              className="btl-input sm:w-auto px-2.5 py-1.5 text-xs sm:text-sm font-mono tabular-nums"
             />
           </label>
 
           <button
             type="button"
             onClick={jumpToToday}
-            className="min-h-[42px] px-3.5 py-2 text-xs sm:text-sm font-medium text-[#1B4332] bg-[#1B4332]/8 hover:bg-[#1B4332]/15 rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer"
+            className="btl-btn btl-btn-gold text-xs sm:text-sm px-3.5 shrink-0"
           >
             Hoje
           </button>
@@ -287,7 +311,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                 setDateFrom('');
                 setDateTo('');
               }}
-              className="min-h-[42px] px-3 py-2 text-xs sm:text-sm font-medium text-[#5A665E] hover:text-[#141A16] whitespace-nowrap shrink-0 cursor-pointer"
+              className="btl-btn btl-btn-secondary text-xs sm:text-sm px-3 shrink-0"
             >
               Limpar
             </button>
@@ -297,11 +321,11 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
       {/* Empty Search Result State */}
       {filteredEntries.length === 0 ? (
-        <div className="bg-white border border-[#DCE1DC] rounded-xl p-10 text-center space-y-3">
-          <p className="text-base font-semibold text-[#141A16]">
+        <div className="btl-card p-10 text-center space-y-3">
+          <p className="text-base font-semibold text-[#F4E6C4]">
             Nenhum registro encontrado para os filtros aplicados
           </p>
-          <p className="text-sm text-[#5A665E]">
+          <p className="text-sm text-[#98A89F]">
             Verifique a grafia do nome do militar ou amplie o período selecionado.
           </p>
           <button
@@ -311,280 +335,324 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
               setDateFrom('');
               setDateTo('');
             }}
-            className="min-h-[40px] px-4 py-2 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] rounded-lg cursor-pointer"
+            className="btl-btn btl-btn-primary text-sm"
           >
             Limpar filtros
           </button>
         </div>
-      ) : viewMode === 'table' ? (
-        /* MODO TABELA — Faithful Spreadsheet View */
-        <div className="bg-white border border-[#DCE1DC] rounded-xl overflow-hidden">
-          <div className="overflow-x-auto schedule-scroll">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="bg-[#16201A] text-white">
-                  <th
-                    scope="col"
-                    className="sticky left-0 z-20 bg-[#16201A] px-3.5 py-3 text-xs font-semibold tracking-wide border-r border-white/15 whitespace-nowrap min-w-[138px]"
-                  >
-                    Data / Dia
-                  </th>
-                  {selectedSchedule.columns.map((col) => (
-                    <th
-                      key={col.id}
-                      scope="col"
-                      className="px-4 py-3 text-xs sm:text-[13px] font-semibold border-r last:border-r-0 border-white/10 whitespace-nowrap min-w-[165px]"
-                    >
-                      <div className="flex flex-col">
-                        <span>{col.label}</span>
-                        {col.kind === 'reference' && (
-                          <span className="text-[10px] font-normal text-[#B7C7BC] mt-0.5">
-                            Referência / Externo
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E4E8E4] text-sm">
-                {filteredEntries.map((entry) => {
-                  const isToday = entry.date === todayIso;
-                  const rowBg = isToday
-                    ? 'bg-[#ECF6F0]'
-                    : entry.isRedScale
-                    ? 'bg-[#FDF5F5]'
-                    : 'bg-white hover:bg-[#F7F9F7]';
-                  const stickyBg = isToday
-                    ? 'bg-[#E2F2E8]'
-                    : entry.isRedScale
-                    ? 'bg-[#FCEBEB]'
-                    : 'bg-[#F9FAF9]';
-
-                  return (
-                    <tr
-                      key={entry.date}
-                      ref={isToday ? todayRowRef : null}
-                      onClick={() => onChangeFocusedDate(entry.date)}
-                      className={`${rowBg} transition-colors`}
-                    >
+      ) : (
+        <AnimatePresence mode="wait">
+          {viewMode === 'table' ? (
+            /* MODO TABELA — Faithful Spreadsheet View */
+            <motion.div
+              key={`table-${selectedSchedule.id}`}
+              variants={VIEW_VARIANTS}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={TRANSITION_VIEW}
+              className="btl-card overflow-hidden"
+            >
+              <div className="overflow-x-auto schedule-scroll">
+                <table className="w-full border-collapse text-left">
+                  <thead>
+                    <tr className="bg-[#0B120E] text-[#F4E6C4] border-b border-[#C9A961]/25">
                       <th
-                        scope="row"
-                        className={`sticky left-0 z-10 ${stickyBg} px-3.5 py-2.5 border-r border-[#DCE1DC] whitespace-nowrap font-normal align-middle`}
+                        scope="col"
+                        className="sticky left-0 z-20 bg-[#0B120E] px-3.5 py-3.5 text-xs font-semibold tracking-wide border-r border-[#EBE0C8]/15 whitespace-nowrap min-w-[146px]"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-baseline gap-2">
-                            <span
-                              className={`font-mono text-xs sm:text-[13px] font-semibold tabular-nums ${
-                                entry.isRedScale ? 'text-[#B91C1C]' : 'text-[#141A16]'
-                              }`}
-                            >
-                              {formatShortDatePt(entry.date)}
-                            </span>
-                            <span
-                              className={`font-mono text-xs tabular-nums ${
-                                entry.isRedScale ? 'text-[#B91C1C] font-medium' : 'text-[#5A665E]'
-                              }`}
-                            >
-                              ({entry.dayOfWeek})
-                            </span>
-                          </div>
-                          {isToday && (
-                            <span className="text-[11px] font-semibold text-[#1B4332]">Hoje</span>
-                          )}
-                          {!isToday && entry.holidayLabel && (
-                            <span className="text-[11px] font-medium text-[#B91C1C]">
-                              {entry.holidayLabel}
-                            </span>
-                          )}
-                        </div>
+                        Data / Dia
                       </th>
-
                       {selectedSchedule.columns.map((col) => (
-                        <td
+                        <th
                           key={col.id}
-                          className="px-4 py-2.5 border-r last:border-r-0 border-[#EEF1EE] align-middle whitespace-nowrap text-[13px] sm:text-sm"
+                          scope="col"
+                          className="px-4 py-3.5 text-xs sm:text-[13px] font-semibold border-r last:border-r-0 border-[#EBE0C8]/10 whitespace-nowrap min-w-[165px]"
                         >
-                          {renderAssignmentValue(entry.assignments[col.id] ?? '', normalizedQuery)}
-                        </td>
+                          <div className="flex flex-col">
+                            <span>{col.label}</span>
+                            {col.kind === 'reference' && (
+                              <span className="text-[10px] font-normal text-[#C8A461]/80 mt-0.5">
+                                Referência / Externo
+                              </span>
+                            )}
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-4 py-2.5 bg-[#F7F8F7] border-t border-[#E2E6E2] flex flex-wrap items-center justify-between gap-2 text-xs text-[#5A665E]">
-            <span>
-              Legenda: datas em vermelho indicam finais de semana ou feriados (escala vermelha). Nomes entre parênteses indicam troca ou substituição.
-            </span>
-            <span className="font-mono tabular-nums">
-              {filteredEntries.length} linha(s)
-            </span>
-          </div>
-        </div>
-      ) : (
-        /* MODO DIÁRIO — Mobile-First Ergonomic Day Blocks */
-        <div className="space-y-4">
-          {/* Horizontal Date Scroller */}
-          <div className="bg-white border border-[#DCE1DC] rounded-xl p-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={activeDailyIndex <= 0}
-                onClick={() =>
-                  activeDailyIndex > 0 &&
-                  onChangeFocusedDate(filteredEntries[activeDailyIndex - 1].date)
-                }
-                aria-label="Dia anterior"
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#DCE1DC] text-[#141A16] disabled:opacity-35 hover:bg-[#F2F4F2] shrink-0 cursor-pointer disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
+                  </thead>
+                  <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
+                    {filteredEntries.map((entry) => {
+                      const isToday = entry.date === todayIso;
+                      const rowBg = isToday
+                        ? 'bg-[#2D5A43]/22'
+                        : entry.isRedScale
+                        ? 'bg-[#7F1D1D]/18'
+                        : 'bg-transparent hover:bg-[#E4EAE6]/[0.04]';
+                      const stickyBg = isToday
+                        ? 'bg-[#12261C]'
+                        : entry.isRedScale
+                        ? 'bg-[#231012]'
+                        : 'bg-[#0C1310]';
 
-              <div className="flex items-center gap-1.5 overflow-x-auto schedule-scroll py-0.5 flex-1">
-                {filteredEntries.map((entry) => {
-                  const isSelected = activeDailyEntry?.date === entry.date;
-                  const isToday = entry.date === todayIso;
-                  const dayNum = entry.date.slice(8, 10);
-                  return (
-                    <button
-                      key={entry.date}
-                      type="button"
-                      onClick={() => onChangeFocusedDate(entry.date)}
-                      className={`min-w-[56px] min-h-[54px] px-2.5 py-1.5 rounded-lg flex flex-col items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                        isSelected
-                          ? 'bg-[#16201A] text-white'
-                          : isToday
-                          ? 'bg-[#ECF6F0] text-[#1B4332] border border-[#1B4332]/40'
-                          : entry.isRedScale
-                          ? 'bg-[#FDF5F5] text-[#B91C1C] hover:bg-[#FCEBEB]'
-                          : 'bg-[#F7F8F7] text-[#3E4841] hover:bg-[#EBEEEB]'
-                      }`}
-                    >
-                      <span className="text-[11px] font-medium leading-none opacity-85">
-                        {entry.dayOfWeek}
-                      </span>
-                      <span className="font-mono text-sm font-bold tabular-nums mt-1 leading-none">
-                        {dayNum}
-                      </span>
-                      {isToday && (
-                        <span
-                          className={`text-[9px] font-semibold mt-0.5 leading-none ${
-                            isSelected ? 'text-[#A7F3D0]' : 'text-[#1B4332]'
+                      return (
+                        <tr
+                          key={entry.date}
+                          ref={isToday ? todayRowRef : null}
+                          onClick={() => onChangeFocusedDate(entry.date)}
+                          className={`${rowBg} transition-colors`}
+                        >
+                          <th
+                            scope="row"
+                            className={`sticky left-0 z-10 ${stickyBg} px-3.5 py-2.5 border-r border-[#EBE0C8]/12 whitespace-nowrap font-normal align-middle`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-baseline gap-2">
+                                <span
+                                  className={`font-mono text-xs sm:text-[13px] font-semibold tabular-nums ${
+                                    entry.isRedScale
+                                      ? 'text-[#FCA5A5]'
+                                      : isToday
+                                      ? 'text-[#A8D8BE]'
+                                      : 'text-[#E4EAE6]'
+                                  }`}
+                                >
+                                  {formatShortDatePt(entry.date)}
+                                </span>
+                                <span
+                                  className={`font-mono text-xs tabular-nums ${
+                                    entry.isRedScale
+                                      ? 'text-[#F87171] font-medium'
+                                      : 'text-[#7D8F85]'
+                                  }`}
+                                >
+                                  ({entry.dayOfWeek})
+                                </span>
+                              </div>
+                              {isToday && (
+                                <span className="text-[11px] font-semibold text-[#A8D8BE]">
+                                  Hoje
+                                </span>
+                              )}
+                              {!isToday && entry.holidayLabel && (
+                                <span className="text-[11px] font-medium text-[#FCA5A5]">
+                                  {entry.holidayLabel}
+                                </span>
+                              )}
+                            </div>
+                          </th>
+
+                          {selectedSchedule.columns.map((col) => (
+                            <td
+                              key={col.id}
+                              className="px-4 py-2.5 border-r last:border-r-0 border-[#EBE0C8]/8 align-middle whitespace-nowrap text-[13px] sm:text-sm"
+                            >
+                              {renderAssignmentValue(
+                                entry.assignments[col.id] ?? '',
+                                normalizedQuery
+                              )}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div className="px-4 py-3 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+                <span>
+                  Legenda: datas em vermelho indicam finais de semana ou feriados (escala vermelha). Nomes entre parênteses indicam troca ou substituição.
+                </span>
+                <span className="font-mono tabular-nums text-[#E5C17B]">
+                  {filteredEntries.length} linha(s)
+                </span>
+              </div>
+            </motion.div>
+          ) : (
+            /* MODO DIÁRIO — Mobile-First Ergonomic Day Blocks */
+            <motion.div
+              key={`daily-${selectedSchedule.id}`}
+              variants={VIEW_VARIANTS}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={TRANSITION_VIEW}
+              className="space-y-4"
+            >
+              {/* Horizontal Date Scroller */}
+              <div className="btl-panel p-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={activeDailyIndex <= 0}
+                    onClick={() =>
+                      activeDailyIndex > 0 &&
+                      onChangeFocusedDate(filteredEntries[activeDailyIndex - 1].date)
+                    }
+                    aria-label="Dia anterior"
+                    className="btl-btn btl-btn-secondary min-w-[44px] min-h-[44px] p-0 shrink-0"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+
+                  <div className="flex items-center gap-1.5 overflow-x-auto schedule-scroll py-0.5 flex-1">
+                    {filteredEntries.map((entry) => {
+                      const isSelected = activeDailyEntry?.date === entry.date;
+                      const isToday = entry.date === todayIso;
+                      const dayNum = entry.date.slice(8, 10);
+                      return (
+                        <button
+                          key={entry.date}
+                          type="button"
+                          onClick={() => onChangeFocusedDate(entry.date)}
+                          className={`min-w-[56px] min-h-[54px] px-2.5 py-1.5 rounded-lg flex flex-col items-center justify-center shrink-0 border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-gradient-to-b from-[#2D5A43]/85 to-[#1B3A2A]/90 border-[#C8A461]/60 text-[#F4E6C4] shadow-[inset_0_1px_0_rgba(255,250,236,0.22)]'
+                              : isToday
+                              ? 'bg-[#2D5A43]/22 text-[#A8D8BE] border-[#83B499]/40 hover:border-[#83B499]/70'
+                              : entry.isRedScale
+                              ? 'bg-[#7F1D1D]/20 text-[#FCA5A5] border-[#F87171]/25 hover:bg-[#7F1D1D]/30'
+                              : 'bg-[#0C1310]/70 text-[#98A89F] border-[#EBE0C8]/10 hover:text-[#E4EAE6] hover:border-[#EBE0C8]/25'
                           }`}
                         >
-                          Hoje
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                disabled={activeDailyIndex >= filteredEntries.length - 1}
-                onClick={() =>
-                  activeDailyIndex < filteredEntries.length - 1 &&
-                  onChangeFocusedDate(filteredEntries[activeDailyIndex + 1].date)
-                }
-                aria-label="Próximo dia"
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg border border-[#DCE1DC] text-[#141A16] disabled:opacity-35 hover:bg-[#F2F4F2] shrink-0 cursor-pointer disabled:cursor-not-allowed"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Active Day Sheet */}
-          {activeDailyEntry && (
-            <div className="bg-white border border-[#DCE1DC] rounded-xl overflow-hidden">
-              <div
-                className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3 ${
-                  activeDailyEntry.date === todayIso
-                    ? 'bg-[#1B4332] text-white border-[#1B4332]'
-                    : activeDailyEntry.isRedScale
-                    ? 'bg-[#7F1D1D] text-white border-[#7F1D1D]'
-                    : 'bg-[#16201A] text-white border-[#16201A]'
-                }`}
-              >
-                <div>
-                  <div className="flex items-center gap-2 text-xs opacity-85">
-                    <span>{selectedSchedule.name}</span>
-                    {activeDailyEntry.date === todayIso && (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span className="font-semibold">Serviço de Hoje</span>
-                      </>
-                    )}
-                    {activeDailyEntry.isRedScale && (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span>{activeDailyEntry.holidayLabel || 'Escala Vermelha'}</span>
-                      </>
-                    )}
+                          <span className="text-[11px] font-medium leading-none opacity-85">
+                            {entry.dayOfWeek}
+                          </span>
+                          <span className="font-mono text-sm font-bold tabular-nums mt-1 leading-none">
+                            {dayNum}
+                          </span>
+                          {isToday && (
+                            <span
+                              className={`text-[9px] font-semibold mt-0.5 leading-none ${
+                                isSelected ? 'text-[#E5C17B]' : 'text-[#A8D8BE]'
+                              }`}
+                            >
+                              Hoje
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <h2 className="font-display text-lg sm:text-xl font-bold font-mono tabular-nums mt-0.5">
-                    {formatFullDatePt(activeDailyEntry.date)}
-                  </h2>
-                </div>
 
-                <label className="inline-flex items-center gap-2 text-xs text-white/90 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={onlyAssignedInDaily}
-                    onChange={(e) => setOnlyAssignedInDaily(e.target.checked)}
-                    className="rounded border-white/40 accent-white"
-                  />
-                  <span>Ocultar funções vazias</span>
-                </label>
+                  <button
+                    type="button"
+                    disabled={activeDailyIndex >= filteredEntries.length - 1}
+                    onClick={() =>
+                      activeDailyIndex < filteredEntries.length - 1 &&
+                      onChangeFocusedDate(filteredEntries[activeDailyIndex + 1].date)
+                    }
+                    aria-label="Próximo dia"
+                    className="btl-btn btl-btn-secondary min-w-[44px] min-h-[44px] p-0 shrink-0"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
-              <div className="divide-y divide-[#EEF1EE]">
-                {selectedSchedule.columns
-                  .filter(
-                    (col) =>
-                      !onlyAssignedInDaily ||
-                      (activeDailyEntry.assignments[col.id] ?? '').trim().length > 0
-                  )
-                  .map((col) => {
-                    const value = (activeDailyEntry.assignments[col.id] ?? '').trim();
-                    return (
-                      <div
-                        key={col.id}
-                        className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-6"
-                      >
-                        <div className="space-y-0.5">
-                          <div className="text-xs font-semibold text-[#4A554E]">
-                            {col.label}
-                          </div>
-                          {col.kind === 'reference' && (
-                            <div className="text-[11px] text-[#7A877E]">
-                              Referência / Serviço externo
-                            </div>
+              {/* Active Day Sheet */}
+              <AnimatePresence mode="wait">
+                {activeDailyEntry && (
+                  <motion.div
+                    key={activeDailyEntry.date}
+                    variants={VIEW_VARIANTS}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    transition={TRANSITION_VIEW}
+                    className="btl-card overflow-hidden"
+                  >
+                    <div
+                      className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3 ${
+                        activeDailyEntry.date === todayIso
+                          ? 'bg-gradient-to-r from-[#1A3829]/90 to-[#0E1F17]/90 border-[#83B499]/30'
+                          : activeDailyEntry.isRedScale
+                          ? 'bg-gradient-to-r from-[#451418]/90 to-[#220E10]/90 border-[#F87171]/30'
+                          : 'bg-[#0B120E]/90 border-[#C9A961]/22'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#C8D4CD]">
+                          <span>{selectedSchedule.name}</span>
+                          {activeDailyEntry.date === todayIso && (
+                            <>
+                              <span aria-hidden="true" className="text-[#697870]">·</span>
+                              <span className="font-semibold text-[#A8D8BE]">Serviço de Hoje</span>
+                            </>
+                          )}
+                          {activeDailyEntry.isRedScale && (
+                            <>
+                              <span aria-hidden="true" className="text-[#697870]">·</span>
+                              <span className="text-[#FCA5A5]">
+                                {activeDailyEntry.holidayLabel || 'Escala Vermelha'}
+                              </span>
+                            </>
                           )}
                         </div>
-                        <div className="text-base sm:text-right">
-                          {value ? (
-                            renderAssignmentValue(value, normalizedQuery)
-                          ) : (
-                            <span className="text-sm text-[#9AA69D]">Sem escalação</span>
-                          )}
-                        </div>
+                        <h2 className="font-display text-lg sm:text-xl font-bold font-mono tabular-nums text-[#F4E6C4] mt-0.5">
+                          {formatFullDatePt(activeDailyEntry.date)}
+                        </h2>
                       </div>
-                    );
-                  })}
-              </div>
 
-              {activeDailyEntry.notes && (
-                <div className="px-5 py-3.5 bg-[#F7F8F7] border-t border-[#E2E6E2] text-xs text-[#4A554E]">
-                  <strong>Observação:</strong> {activeDailyEntry.notes}
-                </div>
-              )}
-            </div>
+                      <label className="inline-flex items-center gap-2 text-xs text-[#C8D4CD] cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={onlyAssignedInDaily}
+                          onChange={(e) => setOnlyAssignedInDaily(e.target.checked)}
+                          className="rounded border-[#EBE0C8]/30 accent-[#C8A461]"
+                        />
+                        <span>Ocultar funções vazias</span>
+                      </label>
+                    </div>
+
+                    <div className="divide-y divide-[#EBE0C8]/10">
+                      {selectedSchedule.columns
+                        .filter(
+                          (col) =>
+                            !onlyAssignedInDaily ||
+                            (activeDailyEntry.assignments[col.id] ?? '').trim().length > 0
+                        )
+                        .map((col) => {
+                          const value = (activeDailyEntry.assignments[col.id] ?? '').trim();
+                          return (
+                            <div
+                              key={col.id}
+                              className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-6 hover:bg-[#E4EAE6]/[0.025] transition-colors"
+                            >
+                              <div className="space-y-0.5">
+                                <div className="text-xs font-semibold text-[#C8D4CD]">
+                                  {col.label}
+                                </div>
+                                {col.kind === 'reference' && (
+                                  <div className="text-[11px] text-[#C8A461]/80">
+                                    Referência / Serviço externo
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-base sm:text-right">
+                                {value ? (
+                                  renderAssignmentValue(value, normalizedQuery)
+                                ) : (
+                                  <span className="text-sm text-[#697870]">Sem escalação</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {activeDailyEntry.notes && (
+                      <div className="px-5 py-3.5 bg-[#090F0C]/80 border-t border-[#EBE0C8]/10 text-xs text-[#98A89F]">
+                        <strong className="text-[#E5C17B]">Observação:</strong>{' '}
+                        {activeDailyEntry.notes}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       )}
     </div>
   );
