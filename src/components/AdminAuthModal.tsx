@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { signInWithPopup, signOut } from 'firebase/auth';
-import { AlertCircle, CheckCircle2, KeyRound, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
+import {
+  AlertCircle,
+  Check,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+  KeyRound,
+  Lock,
+  RefreshCw,
+  ShieldCheck,
+  X,
+} from 'lucide-react';
 import {
   AdminApiError,
   fetchFirebasePasscodeRecord,
@@ -13,7 +24,7 @@ import {
   type AdminAuthMode,
   type FirebasePasscodeRecord,
 } from '../lib/adminApi';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth, firebaseProjectId, googleProvider } from '../lib/firebase';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -45,6 +56,8 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const [firebaseRecord, setFirebaseRecord] = useState<FirebasePasscodeRecord | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [unauthorizedHost, setUnauthorizedHost] = useState<string | null>(null);
+  const [copiedHost, setCopiedHost] = useState(false);
 
   const loadFirebasePasscodeState = useCallback(async () => {
     const record = await fetchFirebasePasscodeRecord();
@@ -96,15 +109,29 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     setConfirmPassword('');
     setErrorMsg('');
     setStatusError('');
+    setUnauthorizedHost(null);
+    setCopiedHost(false);
     setVerifiedServerToken(null);
     void loadStatus();
   }, [isOpen, loadStatus]);
 
   if (!isOpen) return null;
 
+  const handleCopyHost = async () => {
+    if (!unauthorizedHost) return;
+    try {
+      await navigator.clipboard.writeText(unauthorizedHost);
+      setCopiedHost(true);
+      setTimeout(() => setCopiedHost(false), 2000);
+    } catch {
+      // Clipboard API unavailable in non-secure context
+    }
+  };
+
   // Firebase mode Step 1: verify authorized admin identity with Google + Firestore Security Rules
   const handleFirebaseAdminSignIn = async () => {
     setErrorMsg('');
+    setUnauthorizedHost(null);
     setLinkingDb(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -127,8 +154,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             'O navegador bloqueou a janela de login Google. Permita pop-ups para este site e tente novamente.'
           );
         } else if (code === 'auth/unauthorized-domain') {
+          const host = typeof window !== 'undefined' ? window.location.hostname : '';
+          setUnauthorizedHost(host || 'este domínio');
           setErrorMsg(
-            'Domínio não autorizado no Firebase Authentication. Abra pelo link oficial do aplicativo.'
+            `O domínio "${host}" ainda não está autorizado no Firebase Authentication do projeto.`
           );
         } else {
           setErrorMsg('Não foi possível validar a conta administradora.');
@@ -208,6 +237,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   const handleAuthorizeDatabase = async () => {
     if (!verifiedServerToken) return;
     setErrorMsg('');
+    setUnauthorizedHost(null);
     setLinkingDb(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -225,8 +255,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           'O navegador bloqueou a janela de autorização Google. Permita pop-ups para este site e tente novamente.'
         );
       } else if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        setUnauthorizedHost(host || 'este domínio');
         setErrorMsg(
-          'Domínio não autorizado no Firebase Authentication. Abra o aplicativo pelo endereço oficial.'
+          `O domínio "${host}" ainda não está autorizado no Firebase Authentication do projeto.`
         );
       } else {
         setErrorMsg('Não foi possível autorizar a conta administradora do banco de dados.');
@@ -323,10 +355,42 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               {errorMsg && (
                 <div
                   role="alert"
-                  className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B]"
+                  className="space-y-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B]"
                 >
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{errorMsg}</span>
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{errorMsg}</span>
+                  </div>
+                  {unauthorizedHost && (
+                    <div className="pt-2 border-t border-[#FECACA] space-y-2 text-[#7F1D1D]">
+                      <p>
+                        Adicione este domínio em{' '}
+                        <strong>Firebase Console → Authentication → Settings → Domínios autorizados</strong>:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 px-2.5 py-1.5 bg-white border border-[#FECACA] rounded font-mono text-[11px] text-[#141A16] break-all select-all">
+                          {unauthorizedHost}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyHost()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-[#FEE2E2] border border-[#FECACA] rounded text-[11px] font-medium text-[#991B1B] shrink-0 cursor-pointer"
+                        >
+                          {copiedHost ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedHost ? 'Copiado' : 'Copiar'}</span>
+                        </button>
+                      </div>
+                      <a
+                        href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/settings`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-semibold text-[#1B4332] hover:underline"
+                      >
+                        <span>Abrir Domínios Autorizados no Firebase Console</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -362,10 +426,42 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               {errorMsg && (
                 <div
                   role="alert"
-                  className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B]"
+                  className="space-y-2.5 p-3.5 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B]"
                 >
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{errorMsg}</span>
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <span>{errorMsg}</span>
+                  </div>
+                  {unauthorizedHost && (
+                    <div className="pt-2 border-t border-[#FECACA] space-y-2 text-[#7F1D1D]">
+                      <p>
+                        Adicione este domínio em{' '}
+                        <strong>Firebase Console → Authentication → Settings → Domínios autorizados</strong>:
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 px-2.5 py-1.5 bg-white border border-[#FECACA] rounded font-mono text-[11px] text-[#141A16] break-all select-all">
+                          {unauthorizedHost}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={() => void handleCopyHost()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-[#FEE2E2] border border-[#FECACA] rounded text-[11px] font-medium text-[#991B1B] shrink-0 cursor-pointer"
+                        >
+                          {copiedHost ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedHost ? 'Copiado' : 'Copiar'}</span>
+                        </button>
+                      </div>
+                      <a
+                        href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/settings`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-semibold text-[#1B4332] hover:underline"
+                      >
+                        <span>Abrir Domínios Autorizados no Firebase Console</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               )}
 
