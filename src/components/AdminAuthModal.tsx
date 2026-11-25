@@ -1,12 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { signInWithPopup } from 'firebase/auth';
+import { signInWithPopup, signOut } from 'firebase/auth';
 import { AlertCircle, CheckCircle2, KeyRound, Lock, RefreshCw, ShieldCheck, X } from 'lucide-react';
 import {
   AdminApiError,
+  fetchFirebasePasscodeRecord,
   getAdminStatus,
   loginAdminPassword,
   logoutAdminToken,
   setupAdminPassword,
+  setupFirebaseAdminPasscode,
+  verifyFirebaseAdminPasscode,
+  type AdminAuthMode,
+  type FirebasePasscodeRecord,
 } from '../lib/adminApi';
 import { auth, googleProvider } from '../lib/firebase';
 
@@ -23,23 +28,57 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 }) => {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [statusError, setStatusError] = useState('');
+  const [authMode, setAuthMode] = useState<AdminAuthMode>('express');
   const [needsSetup, setNeedsSetup] = useState(false);
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Step 2: once server password succeeds, ensure Firestore admin auth is active for database writes
+  // Express mode step 2 (after server password): link Google admin account for Firestore writes
   const [verifiedServerToken, setVerifiedServerToken] = useState<string | null>(null);
   const [linkingDb, setLinkingDb] = useState(false);
+
+  // Firebase mode state: step 1 Google admin verification -> step 2 passcode check/setup
+  const [firebaseAdminVerified, setFirebaseAdminVerified] = useState(false);
+  const [firebaseRecord, setFirebaseRecord] = useState<FirebasePasscodeRecord | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+
+  const loadFirebasePasscodeState = useCallback(async () => {
+    const record = await fetchFirebasePasscodeRecord();
+    setFirebaseRecord(record);
+    setNeedsSetup(record === null);
+    setFirebaseAdminVerified(true);
+  }, []);
 
   const loadStatus = useCallback(async () => {
     setLoadingStatus(true);
     setStatusError('');
     setErrorMsg('');
+    setFirebaseAdminVerified(false);
+    setFirebaseRecord(null);
+
     try {
       const data = await getAdminStatus();
-      setNeedsSetup(!data.configured);
+      setAuthMode(data.mode);
+
+      if (data.mode === 'express') {
+        setNeedsSetup(!data.configured);
+      } else {
+        // In Firebase server mode (shared/static PWA), if admin Google session is already active,
+        // verify permission against Firestore right away before asking for the admin passcode.
+        if (auth.currentUser && auth.currentUser.emailVerified) {
+          try {
+            await loadFirebasePasscodeState();
+          } catch {
+            // If current Google user is not an admin, sign out and prompt Google admin sign-in
+            await signOut(auth).catch(() => {});
+            setFirebaseAdminVerified(false);
+          }
+        }
+      }
     } catch (err) {
       const msg =
         err instanceof AdminApiError
@@ -49,7 +88,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     } finally {
       setLoadingStatus(false);
     }
-  }, []);
+  }, [loadFirebasePasscodeState]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -63,32 +102,98 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
   if (!isOpen) return null;
 
+  // Firebase mode Step 1: verify authorized admin identity with Google + Firestore Security Rules
+  const handleFirebaseAdminSignIn = async () => {
+    setErrorMsg('');
+    setLinkingDb(true);
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      if (!result.user.emailVerified) {
+        await signOut(auth).catch(() => {});
+        setErrorMsg('A conta selecionada precisa possuir e-mail verificado.');
+        return;
+      }
+      await loadFirebasePasscodeState();
+    } catch (err: unknown) {
+      if (err instanceof AdminApiError) {
+        await signOut(auth).catch(() => {});
+        setErrorMsg(err.message);
+      } else {
+        const code = (err as { code?: string })?.code;
+        if (code === 'auth/popup-closed-by-user') {
+          setErrorMsg('Autenticação cancelada. Confirme sua conta administradora para continuar.');
+        } else if (code === 'auth/popup-blocked') {
+          setErrorMsg(
+            'O navegador bloqueou a janela de login Google. Permita pop-ups para este site e tente novamente.'
+          );
+        } else if (code === 'auth/unauthorized-domain') {
+          setErrorMsg(
+            'Domínio não autorizado no Firebase Authentication. Abra pelo link oficial do aplicativo.'
+          );
+        } else {
+          setErrorMsg('Não foi possível validar a conta administradora.');
+        }
+      }
+    } finally {
+      setLinkingDb(false);
+    }
+  };
+
+  // Express mode Step 1 OR Firebase mode Step 2: validate single admin password
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+
+    const now = Date.now();
+    if (authMode === 'firebase' && now < cooldownUntil) {
+      const remaining = Math.ceil((cooldownUntil - now) / 1000);
+      setErrorMsg(`Muitas tentativas inválidas. Aguarde ${remaining}s para tentar novamente.`);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const data = needsSetup
-        ? await setupAdminPassword(password, confirmPassword)
-        : await loginAdminPassword(password);
+      if (authMode === 'express') {
+        const data = needsSetup
+          ? await setupAdminPassword(password, confirmPassword)
+          : await loginAdminPassword(password);
 
-      const token = String(data.token || '');
-      if (!token) {
-        setErrorMsg('Resposta inválida do servidor.');
-        return;
-      }
+        const token = String(data.token || '');
+        if (!token) {
+          setErrorMsg('Resposta inválida do servidor.');
+          return;
+        }
 
-      // Check if Firebase admin session is already signed in and verified
-      if (auth.currentUser && auth.currentUser.emailVerified) {
-        onAuthenticated(token);
+        if (auth.currentUser && auth.currentUser.emailVerified) {
+          onAuthenticated(token);
+        } else {
+          setVerifiedServerToken(token);
+        }
       } else {
-        setVerifiedServerToken(token);
+        // Firebase server-enforced mode
+        const data = needsSetup
+          ? await setupFirebaseAdminPasscode(password, confirmPassword)
+          : await verifyFirebaseAdminPasscode(password, firebaseRecord!);
+
+        setFailedAttempts(0);
+        setCooldownUntil(0);
+        onAuthenticated(data.token);
       }
     } catch (err) {
       if (err instanceof AdminApiError) {
         if (err.needsSetup) {
           setNeedsSetup(true);
+        }
+        if (authMode === 'firebase' && err.status === 401) {
+          const nextFails = failedAttempts + 1;
+          setFailedAttempts(nextFails);
+          if (nextFails >= 5) {
+            setCooldownUntil(Date.now() + 60_000);
+            setFailedAttempts(0);
+            setErrorMsg('Muitas tentativas incorretas. Aguarde 60 segundos para tentar novamente.');
+            return;
+          }
         }
         setErrorMsg(err.message);
       } else {
@@ -99,6 +204,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     }
   };
 
+  // Express mode Step 2: link Google admin account for Firestore writes
   const handleAuthorizeDatabase = async () => {
     if (!verifiedServerToken) return;
     setErrorMsg('');
@@ -120,7 +226,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         );
       } else if (code === 'auth/unauthorized-domain') {
         setErrorMsg(
-          'Domínio não autorizado no Firebase Authentication. Abra o aplicativo pelo endereço oficial ou adicione o domínio nas configurações.'
+          'Domínio não autorizado no Firebase Authentication. Abra o aplicativo pelo endereço oficial.'
         );
       } else {
         setErrorMsg('Não foi possível autorizar a conta administradora do banco de dados.');
@@ -131,12 +237,24 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
   };
 
   const handleCancel = () => {
-    // If server token was issued in step 1 and user cancels step 2, revoke it immediately
     if (verifiedServerToken) {
       void logoutAdminToken(verifiedServerToken);
     }
+    if (authMode === 'firebase' && auth.currentUser) {
+      void signOut(auth).catch(() => {});
+    }
     onClose();
   };
+
+  const needsFirebaseSignInFirst = authMode === 'firebase' && !firebaseAdminVerified;
+
+  const modalTitle = verifiedServerToken
+    ? 'Autorizar Banco Online'
+    : needsFirebaseSignInFirst
+    ? 'Acesso à Área Administrativa'
+    : needsSetup
+    ? 'Configurar Senha Administrativa'
+    : 'Acesso à Área Administrativa';
 
   return (
     <div
@@ -150,11 +268,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           <div className="flex items-center gap-2.5">
             <Lock className="w-4 h-4 text-[#A7F3D0]" />
             <h2 id="admin-auth-title" className="font-display text-base font-semibold">
-              {verifiedServerToken
-                ? 'Autorizar Banco Online'
-                : needsSetup
-                ? 'Configurar Senha Administrativa'
-                : 'Acesso à Área Administrativa'}
+              {modalTitle}
             </h2>
           </div>
           <button
@@ -199,8 +313,44 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 </button>
               </div>
             </div>
+          ) : needsFirebaseSignInFirst ? (
+            /* Firebase Mode Step 1: Verify Authorized Admin Account against Firestore Security Rules */
+            <div className="space-y-4">
+              <p className="text-sm text-[#4A554E] leading-relaxed">
+                Para acessar a área de edição com segurança validada pelo banco de dados, confirme primeiro sua conta administradora e em seguida informe a senha única administrativa.
+              </p>
+
+              {errorMsg && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2.5 p-3 rounded-lg bg-[#FEF2F2] border border-[#FECACA] text-xs text-[#991B1B]"
+                >
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2.5 pt-1">
+                <button
+                  type="button"
+                  disabled={linkingDb}
+                  onClick={() => void handleFirebaseAdminSignIn()}
+                  className="w-full min-h-[44px] px-4 py-2.5 text-sm font-medium text-white bg-[#1B4332] hover:bg-[#143326] disabled:opacity-60 rounded-lg inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>{linkingDb ? 'Validando conta...' : 'Continuar com conta administradora'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="w-full min-h-[40px] px-4 py-2 text-sm font-medium text-[#4A554E] hover:text-[#141A16] rounded-lg cursor-pointer"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
           ) : verifiedServerToken ? (
-            /* Step 2: Link database write permission */
+            /* Express Mode Step 2: Link database write permission */
             <div className="space-y-4">
               <div className="flex items-start gap-3 p-3.5 rounded-lg bg-[#ECF6F0] border border-[#1B4332]/20 text-xs text-[#1B4332]">
                 <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
@@ -239,12 +389,24 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               </div>
             </div>
           ) : (
-            /* Step 1: Server-validated single administrative password */
+            /* Single Administrative Password Form (Express Mode Step 1 OR Firebase Mode Step 2) */
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              {authMode === 'firebase' && (
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[#ECF6F0] border border-[#1B4332]/20 text-xs text-[#1B4332]">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>
+                    Conta administradora confirmada.{' '}
+                    {needsSetup
+                      ? 'Defina agora a senha única administrativa.'
+                      : 'Informe a senha única administrativa para liberar a edição.'}
+                  </span>
+                </div>
+              )}
+
               <p className="text-sm text-[#4A554E] leading-relaxed">
                 {needsSetup
-                  ? 'Defina a senha única administrativa para este servidor. Ela será armazenada com hash seguro no backend e exigida a cada entrada na área de edição.'
-                  : 'Informe a senha única de administrador. A validação é feita no servidor e a sessão é encerrada automaticamente ao sair da área administrativa.'}
+                  ? 'Defina a senha única administrativa. Ela será armazenada apenas como hash criptográfico seguro e exigida todas as vezes que alguém entrar na área de edição.'
+                  : 'Informe a senha única de administrador. A sessão é encerrada automaticamente ao sair da área administrativa.'}
               </p>
 
               {errorMsg && (

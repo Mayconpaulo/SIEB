@@ -180,6 +180,41 @@
         }
       },
       "required": ["role", "createdAt"]
+    },
+    "AdminSecurityConfig": {
+      "title": "AdminSecurityConfig",
+      "description": "Hash criptográfico (PBKDF2-SHA256 com salt) da senha única administrativa, restrito exclusivamente a administradores verificados.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["passcode"]
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["PBKDF2-SHA256"]
+        },
+        "iterations": {
+          "type": "number"
+        },
+        "salt": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 64,
+          "pattern": "^[a-f0-9]+$"
+        },
+        "hash": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 128,
+          "pattern": "^[a-f0-9]+$"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "algorithm", "iterations", "salt", "hash", "updatedAt"]
     }
   },
   "firestore": {
@@ -198,6 +233,10 @@
     "/admins/{uid}": {
       "schema": { "$ref": "#/entities/AdminMember" },
       "description": "Lista restrita de administradores com permissão de escrita."
+    },
+    "/admin_security/{configId}": {
+      "schema": { "$ref": "#/entities/AdminSecurityConfig" },
+      "description": "Configuração restrita do hash da senha administrativa para ambientes estáticos/PWA."
     }
   }
 }

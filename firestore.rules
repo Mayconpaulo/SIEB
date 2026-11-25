@@ -106,6 +106,22 @@ service cloud.firestore {
       data.createdAt is timestamp;
     }
 
+    function isValidAdminSecurityConfig(data, configId) {
+      return data.keys().hasAll([
+        'id', 'algorithm', 'iterations', 'salt', 'hash', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'algorithm', 'iterations', 'salt', 'hash', 'updatedAt'
+      ]) &&
+      data.id == configId &&
+      configId == 'passcode' &&
+      data.algorithm == 'PBKDF2-SHA256' &&
+      data.iterations is number && data.iterations >= 100000 && data.iterations <= 500000 &&
+      data.salt is string && data.salt.size() >= 32 && data.salt.size() <= 64 && data.salt.matches('^[a-f0-9]+$') &&
+      data.hash is string && data.hash.size() >= 64 && data.hash.size() <= 128 && data.hash.matches('^[a-f0-9]+$') &&
+      data.updatedAt is timestamp;
+    }
+
     // --- Collection Rules ---
 
     match /schedules/{scheduleId} {
@@ -179,6 +195,29 @@ service cloud.firestore {
         incoming().createdAt == request.time;
 
       allow update, delete: if isAdmin() && isValidId(uid);
+    }
+
+    match /admin_security/{configId} {
+      allow get: if isAdmin() && isValidId(configId) && configId == 'passcode';
+      allow list: if false;
+
+      allow create: if isAdmin() &&
+        isValidId(configId) &&
+        configId == 'passcode' &&
+        isValidAdminSecurityConfig(incoming(), configId) &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidId(configId) &&
+        configId == 'passcode' &&
+        isValidAdminSecurityConfig(incoming(), configId) &&
+        incoming().id == existing().id &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'algorithm', 'iterations', 'salt', 'hash', 'updatedAt'
+        ]);
+
+      allow delete: if false;
     }
   }
 }
