@@ -1,0 +1,6 @@
+{
+  "name": "Escalas do Batalhão",
+  "description": "Sistema web PWA para consulta em tempo real e gerenciamento modular das escalas de serviço do batalhão.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

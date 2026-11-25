@@ -1,0 +1,203 @@
+{
+  "entities": {
+    "Schedule": {
+      "title": "Schedule",
+      "description": "Modelo configurável de escala de serviço do batalhão com quantidade flexível de colunas e funções.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "shortCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "order": {
+          "type": "number"
+        },
+        "columns": {
+          "type": "array",
+          "description": "Lista ordenada de colunas de função (até 20 colunas por escala)."
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "shortCode",
+        "description",
+        "order",
+        "columns",
+        "active",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ScheduleEntry": {
+      "title": "ScheduleEntry",
+      "description": "Registro diário de serviço pertencente a uma escala específica, identificado por data ISO YYYY-MM-DD.",
+      "type": "object",
+      "properties": {
+        "scheduleId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "dayOfWeek": {
+          "type": "string",
+          "enum": ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
+        },
+        "isRedScale": {
+          "type": "boolean"
+        },
+        "holidayLabel": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "assignments": {
+          "type": "object",
+          "description": "Mapa dinâmico de columnId para nome do militar escalado (incluindo substituições entre parênteses)."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "scheduleId",
+        "date",
+        "dayOfWeek",
+        "isRedScale",
+        "holidayLabel",
+        "assignments",
+        "notes",
+        "updatedAt"
+      ]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Registro imutável do histórico de alterações administrativas nas escalas.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "create_schedule",
+            "update_schedule",
+            "delete_schedule",
+            "update_entries",
+            "create_period",
+            "delete_entry",
+            "seed_initial"
+          ]
+        },
+        "scheduleId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "scheduleName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "actorLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "action",
+        "scheduleId",
+        "scheduleName",
+        "summary",
+        "details",
+        "actorLabel",
+        "createdAt"
+      ]
+    },
+    "AdminMember": {
+      "title": "AdminMember",
+      "description": "Registro de administradores autorizados para escrita no banco.",
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": ["admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/Schedule" },
+      "description": "Coleção principal de modelos de escalas de serviço do batalhão."
+    },
+    "/schedules/{scheduleId}/entries/{dateId}": {
+      "schema": { "$ref": "#/entities/ScheduleEntry" },
+      "description": "Subcoleção de registros diários vinculados a cada modelo de escala."
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Histórico imutável de alterações realizadas pela administração."
+    },
+    "/admins/{uid}": {
+      "schema": { "$ref": "#/entities/AdminMember" },
+      "description": "Lista restrita de administradores com permissão de escrita."
+    }
+  }
+}
