@@ -6,7 +6,12 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
+  const buildId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
   return {
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(buildId),
+    },
     plugins: [
       react(),
       tailwindcss(),
@@ -49,8 +54,15 @@ export default defineConfig(() => {
         workbox: {
           maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-          navigateFallbackDenylist: [/^\/api\//],
+          cleanupOutdatedCaches: true,
+          skipWaiting: true,
+          clientsClaim: true,
+          navigateFallbackDenylist: [/^\/api\//, /^\/version\.json$/],
           runtimeCaching: [
+            {
+              urlPattern: /\/version\.json(\?.*)?$/i,
+              handler: 'NetworkOnly',
+            },
             {
               urlPattern: /^\/api\/.*/i,
               handler: 'NetworkOnly',
@@ -89,6 +101,31 @@ export default defineConfig(() => {
           enabled: false,
         },
       }),
+      // Emits dist/version.json on every production build so open clients detect new deploys immediately.
+      {
+        name: 'emit-version-manifest',
+        apply: 'build',
+        closeBundle(error?: Error): void {
+          if (error) {
+            return;
+          }
+          const distDir = path.resolve(__dirname, 'dist');
+          if (fs.existsSync(distDir)) {
+            fs.writeFileSync(
+              path.join(distDir, 'version.json'),
+              JSON.stringify(
+                {
+                  buildId,
+                  builtAt: new Date().toISOString(),
+                },
+                null,
+                2
+              ),
+              'utf-8'
+            );
+          }
+        },
+      },
       // Copies src/assets into dist/ so root-relative URLs still resolve in production builds.
       {
         name: 'copy-unbundled-src-assets',

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   CalendarRange,
@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatFullDatePt, formatShortDatePt } from '../data/initialSchedules';
+import { getRestoredSlice, registerSnapshotProvider } from '../lib/autoUpdate';
 import {
   buildDynamicMatrix,
   formatPersonnelDisplay,
@@ -127,36 +128,100 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
     return { year: y || 2026, month0: (m || 11) - 1 };
   }, [todayIso]);
 
-  const [periodMode, setPeriodMode] = useState<'month' | 'custom'>('month');
-  const [selectedYear, setSelectedYear] = useState<number>(initialDate.year);
-  const [selectedMonth0, setSelectedMonth0] = useState<number>(initialDate.month0);
+  const restoredMatrix = useMemo(
+    () =>
+      getRestoredSlice<{
+        periodMode?: 'month' | 'custom';
+        selectedYear?: number;
+        selectedMonth0?: number;
+        customStart?: string;
+        customEnd?: string;
+        searchQuery?: string;
+        rankFilter?: string;
+        companyFilter?: string;
+        mobileDisplay?: 'grid' | 'cards';
+        inspectedPersonId?: { personId: string; focusDate?: string } | null;
+        editingDay?: { date: string; isRedScale: boolean; holidayLabel: string } | null;
+      }>('matrix'),
+    []
+  );
+
+  const [periodMode, setPeriodMode] = useState<'month' | 'custom'>(
+    restoredMatrix?.periodMode ?? 'month'
+  );
+  const [selectedYear, setSelectedYear] = useState<number>(
+    restoredMatrix?.selectedYear ?? initialDate.year
+  );
+  const [selectedMonth0, setSelectedMonth0] = useState<number>(
+    restoredMatrix?.selectedMonth0 ?? initialDate.month0
+  );
 
   const initialRange = useMemo(
     () => getMonthDateRange(initialDate.year, initialDate.month0),
     [initialDate]
   );
-  const [customStart, setCustomStart] = useState<string>(initialRange.startDate);
-  const [customEnd, setCustomEnd] = useState<string>(initialRange.endDate);
+  const [customStart, setCustomStart] = useState<string>(
+    restoredMatrix?.customStart ?? initialRange.startDate
+  );
+  const [customEnd, setCustomEnd] = useState<string>(
+    restoredMatrix?.customEnd ?? initialRange.endDate
+  );
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [rankFilter, setRankFilter] = useState('all');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [mobileDisplay, setMobileDisplay] = useState<'grid' | 'cards'>('grid');
+  const [searchQuery, setSearchQuery] = useState(restoredMatrix?.searchQuery ?? '');
+  const [rankFilter, setRankFilter] = useState(restoredMatrix?.rankFilter ?? 'all');
+  const [companyFilter, setCompanyFilter] = useState(restoredMatrix?.companyFilter ?? 'all');
+  const [mobileDisplay, setMobileDisplay] = useState<'grid' | 'cards'>(
+    restoredMatrix?.mobileDisplay ?? 'grid'
+  );
+  const [visibleRows, setVisibleRows] = useState(60);
+
+  useEffect(() => {
+    setVisibleRows(60);
+  }, [searchQuery, rankFilter, companyFilter, selectedYear, selectedMonth0, periodMode]);
 
   // Detail modal state (individual soldier history + optional focused date)
   const [inspectedPersonId, setInspectedPersonId] = useState<{
     personId: string;
     focusDate?: string;
-  } | null>(null);
+  } | null>(restoredMatrix?.inspectedPersonId ?? null);
 
   // Day Red-Scale override modal (Admin mode)
   const [editingDay, setEditingDay] = useState<{
     date: string;
     isRedScale: boolean;
     holidayLabel: string;
-  } | null>(null);
+  } | null>(restoredMatrix?.editingDay ?? null);
   const [savingDay, setSavingDay] = useState(false);
   const [savingScaleMode, setSavingScaleMode] = useState(false);
+
+  const matrixSnapshotRef = useRef({
+    periodMode,
+    selectedYear,
+    selectedMonth0,
+    customStart,
+    customEnd,
+    searchQuery,
+    rankFilter,
+    companyFilter,
+    mobileDisplay,
+    inspectedPersonId,
+    editingDay,
+  });
+  matrixSnapshotRef.current = {
+    periodMode,
+    selectedYear,
+    selectedMonth0,
+    customStart,
+    customEnd,
+    searchQuery,
+    rankFilter,
+    companyFilter,
+    mobileDisplay,
+    inspectedPersonId,
+    editingDay,
+  };
+
+  useEffect(() => registerSnapshotProvider('matrix', () => matrixSnapshotRef.current), []);
 
   const activeRange = useMemo(() => {
     if (periodMode === 'month') {
@@ -193,6 +258,11 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       rankFilter,
       companyFilter,
     ]
+  );
+
+  const visibleMatrixRows = useMemo(
+    () => matrix.rows.slice(0, visibleRows),
+    [matrix.rows, visibleRows]
   );
 
   // Keep inspected modal row reactive whenever personnel/scaleMode or matrix updates
@@ -568,7 +638,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
           {/* Mobile Compact Summary Cards (shown on mobile only when 'Resumo' is active) */}
           {mobileDisplay === 'cards' && (
             <div className="md:hidden space-y-3">
-              {matrix.rows.map((row) => (
+              {visibleMatrixRows.map((row) => (
                 <button
                   key={row.person.id}
                   type="button"
@@ -621,6 +691,29 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                   </div>
                 </button>
               ))}
+              {matrix.rows.length > visibleRows && (
+                <div className="btl-panel p-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+                  <span className="font-mono tabular-nums">
+                    {visibleMatrixRows.length} de {matrix.rows.length}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setVisibleRows((c) => c + 60)}
+                      className="btl-btn btl-btn-secondary min-h-[34px] px-3 py-1 text-xs"
+                    >
+                      Carregar mais (+60)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVisibleRows(matrix.rows.length)}
+                      className="btl-btn btl-btn-secondary min-h-[34px] px-3 py-1 text-xs"
+                    >
+                      Todos
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -749,7 +842,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 </thead>
 
                 <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
-                  {matrix.rows.map((row) => (
+                  {visibleMatrixRows.map((row) => (
                     <tr
                       key={row.person.id}
                       className="hover:bg-[#E4EAE6]/[0.035] transition-colors"
@@ -862,6 +955,29 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 </tbody>
               </table>
             </div>
+            {matrix.rows.length > visibleRows && (
+              <div className="px-4 py-3 bg-[#0B120E]/85 border-t border-[#EBE0C8]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+                <span className="font-mono tabular-nums">
+                  Exibindo {visibleMatrixRows.length} de {matrix.rows.length} militares
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleRows((c) => c + 60)}
+                    className="btl-btn btl-btn-secondary min-h-[34px] px-3 py-1 text-xs"
+                  >
+                    Carregar mais (+60)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVisibleRows(matrix.rows.length)}
+                    className="btl-btn btl-btn-secondary min-h-[34px] px-3 py-1 text-xs"
+                  >
+                    Mostrar todos ({matrix.rows.length})
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}

@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
@@ -11,6 +12,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { BATTALION_PERSONNEL } from '../data/battalionPersonnel';
 import {
   BLUEPRINT_LIMITS,
   SCALE_MODE_LABELS,
@@ -43,6 +45,182 @@ function formatTimestamp(val: unknown): string {
 
 function createDocId(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Merges Firestore personnel records with the preloaded battalion roster when
+ * the battalion roster has not yet been fully persisted to Firestore.
+ */
+function mergeWithBattalionBase(
+  cloudList: PersonnelProfile[],
+  isAdminMode: boolean
+): PersonnelProfile[] {
+  const cloudIds = new Set(cloudList.map((p) => p.id));
+  const syncedEfvCount = cloudList.filter((p) => p.id.startsWith('efv_')).length;
+
+  // In public viewer mode (active-only query), once the battalion roster has been synced
+  // to Firestore, trust Firestore as the authoritative source so deactivated profiles stay hidden.
+  if (!isAdminMode && syncedEfvCount >= Math.floor(BATTALION_PERSONNEL.length * 0.8)) {
+    return cloudList;
+  }
+
+  const merged = [...cloudList];
+  for (const basePerson of BATTALION_PERSONNEL) {
+    if (cloudIds.has(basePerson.id)) continue;
+    const matched = findMatchingPersonnel(
+      { fullName: basePerson.fullName, warName: basePerson.warName, rank: basePerson.rank },
+      cloudList
+    );
+    if (!matched) {
+      merged.push(basePerson);
+    }
+  }
+
+  merged.sort(
+    (a, b) =>
+      a.warName.localeCompare(b.warName, 'pt-BR') ||
+      a.fullName.localeCompare(b.fullName, 'pt-BR')
+  );
+  return merged;
+}
+
+export function countPendingBattalionSync(personnel: PersonnelProfile[]): number {
+  const existingIds = new Set(personnel.filter((p) => Boolean(p.createdAt)).map((p) => p.id));
+  const cloudOnly = personnel.filter((p) => Boolean(p.createdAt));
+  let missing = 0;
+  for (const basePerson of BATTALION_PERSONNEL) {
+    if (existingIds.has(basePerson.id)) continue;
+    const matched = findMatchingPersonnel(
+      { fullName: basePerson.fullName, warName: basePerson.warName, rank: basePerson.rank },
+      cloudOnly
+    );
+    if (!matched) {
+      missing += 1;
+    } else if (
+      basePerson.fullName.length > matched.fullName.length &&
+      basePerson.fullName !== matched.fullName
+    ) {
+      missing += 1;
+    }
+  }
+  return missing;
+}
+
+/**
+ * Idempotently persists the complete battalion roster into Firestore `personnel` collection:
+ * - Creates any missing battalion soldiers using deterministic IDs (`efv_...`) in safe batches of 350.
+ * - Enriches previously auto-registered profiles (fullName/rank/warName) in place without duplicating or losing history.
+ */
+export async function syncBattalionPersonnelToFirestore(
+  adminToken: string,
+  currentPersonnel: PersonnelProfile[]
+): Promise<{ created: number; updated: number }> {
+  await verifyServerAdminToken(adminToken);
+
+  const cloudOnly = currentPersonnel.filter((p) => Boolean(p.createdAt));
+  const cloudById = new Map(cloudOnly.map((p) => [p.id, p]));
+
+  type SyncOp =
+    | { kind: 'create'; person: PersonnelProfile }
+    | { kind: 'update'; existing: PersonnelProfile; base: PersonnelProfile };
+
+  const ops: SyncOp[] = [];
+  const usedCloudIds = new Set<string>();
+
+  for (const base of BATTALION_PERSONNEL) {
+    if (cloudById.has(base.id)) {
+      usedCloudIds.add(base.id);
+      continue;
+    }
+
+    const availableCloud = cloudOnly.filter((p) => !usedCloudIds.has(p.id));
+    const matched = findMatchingPersonnel(
+      { fullName: base.fullName, warName: base.warName, rank: base.rank },
+      availableCloud
+    );
+
+    if (matched) {
+      usedCloudIds.add(matched.id);
+      const needsEnrich =
+        (base.fullName.length > matched.fullName.length && base.fullName !== matched.fullName) ||
+        (!matched.rank && Boolean(base.rank));
+      if (needsEnrich) {
+        ops.push({ kind: 'update', existing: matched, base });
+      }
+      continue;
+    }
+
+    ops.push({ kind: 'create', person: base });
+  }
+
+  if (ops.length === 0) {
+    return { created: 0, updated: 0 };
+  }
+
+  let created = 0;
+  let updated = 0;
+
+  try {
+    for (let i = 0; i < ops.length; i += 350) {
+      const chunk = ops.slice(i, i + 350);
+      const batch = writeBatch(db);
+
+      for (const op of chunk) {
+        if (op.kind === 'create') {
+          const p = op.person;
+          batch.set(doc(db, 'personnel', p.id), {
+            id: p.id,
+            fullName: p.fullName.slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN),
+            warName: p.warName.slice(0, BLUEPRINT_LIMITS.MAX_WAR_NAME_LEN),
+            rank: p.rank.slice(0, BLUEPRINT_LIMITS.MAX_RANK_LEN),
+            company: p.company.slice(0, BLUEPRINT_LIMITS.MAX_COMPANY_LEN),
+            normalizedKey: p.normalizedKey.slice(0, BLUEPRINT_LIMITS.MAX_NORMALIZED_KEY_LEN),
+            active: true,
+            scaleMode: p.scaleMode ?? 'both',
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          created += 1;
+        } else {
+          const { existing, base } = op;
+          const nextFullName = (
+            base.fullName.length > existing.fullName.length ? base.fullName : existing.fullName
+          ).slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN);
+          const nextRank = (existing.rank || base.rank).slice(0, BLUEPRINT_LIMITS.MAX_RANK_LEN);
+          batch.update(doc(db, 'personnel', existing.id), {
+            fullName: nextFullName,
+            warName: existing.warName,
+            rank: nextRank,
+            company: existing.company,
+            normalizedKey: existing.normalizedKey,
+            updatedAt: serverTimestamp(),
+          });
+          updated += 1;
+        }
+      }
+
+      if (i + 350 >= ops.length) {
+        batch.set(doc(db, 'audit_logs', createDocId('log')), {
+          action: 'import_personnel',
+          scheduleId: 'efetivo',
+          scheduleName: 'Efetivo',
+          summary: `Relação oficial do batalhão sincronizada: ${created} cadastrado(s), ${updated} atualizado(s)`.slice(
+            0,
+            BLUEPRINT_LIMITS.MAX_SUMMARY_LEN
+          ),
+          details: 'Efetivo completo importado do SisBol (1º BI Mec Es) sem duplicações.',
+          actorLabel: 'Administrador',
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      await batch.commit();
+    }
+
+    return { created, updated };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'personnel');
+  }
 }
 
 // --- Real-Time Subscriptions ---
@@ -79,8 +257,7 @@ export function subscribeToPersonnel(
           updatedAt: formatTimestamp(d.updatedAt),
         };
       });
-      list.sort((a, b) => a.warName.localeCompare(b.warName, 'pt-BR'));
-      onData(list);
+      onData(mergeWithBattalionBase(list, isAdminMode));
     },
     (error) => {
       try {
@@ -427,16 +604,33 @@ export async function updatePersonnelProfile(
   }
 
   try {
+    const personRef = doc(db, 'personnel', person.id);
+    const snap = await getDoc(personRef);
     const batch = writeBatch(db);
-    batch.update(doc(db, 'personnel', person.id), {
-      fullName,
-      warName,
-      rank,
-      company,
-      normalizedKey,
-      scaleMode,
-      updatedAt: serverTimestamp(),
-    });
+    if (snap.exists()) {
+      batch.update(personRef, {
+        fullName,
+        warName,
+        rank,
+        company,
+        normalizedKey,
+        scaleMode,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      batch.set(personRef, {
+        id: person.id,
+        fullName,
+        warName,
+        rank,
+        company,
+        normalizedKey,
+        active: person.active,
+        scaleMode,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
     batch.set(doc(db, 'audit_logs', createDocId('log')), {
       action: 'update_personnel',
       scheduleId: person.id,
@@ -466,11 +660,28 @@ export async function updatePersonnelScaleMode(
   await verifyServerAdminToken(adminToken);
 
   try {
+    const personRef = doc(db, 'personnel', person.id);
+    const snap = await getDoc(personRef);
     const batch = writeBatch(db);
-    batch.update(doc(db, 'personnel', person.id), {
-      scaleMode,
-      updatedAt: serverTimestamp(),
-    });
+    if (snap.exists()) {
+      batch.update(personRef, {
+        scaleMode,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      batch.set(personRef, {
+        id: person.id,
+        fullName: person.fullName.slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN),
+        warName: person.warName.slice(0, BLUEPRINT_LIMITS.MAX_WAR_NAME_LEN),
+        rank: person.rank.slice(0, BLUEPRINT_LIMITS.MAX_RANK_LEN),
+        company: person.company.slice(0, BLUEPRINT_LIMITS.MAX_COMPANY_LEN),
+        normalizedKey: person.normalizedKey.slice(0, BLUEPRINT_LIMITS.MAX_NORMALIZED_KEY_LEN),
+        active: person.active,
+        scaleMode,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
     batch.set(doc(db, 'audit_logs', createDocId('log')), {
       action: 'update_personnel',
       scheduleId: person.id,
@@ -500,11 +711,28 @@ export async function setPersonnelActiveStatus(
   await verifyServerAdminToken(adminToken);
 
   try {
+    const personRef = doc(db, 'personnel', person.id);
+    const snap = await getDoc(personRef);
     const batch = writeBatch(db);
-    batch.update(doc(db, 'personnel', person.id), {
-      active,
-      updatedAt: serverTimestamp(),
-    });
+    if (snap.exists()) {
+      batch.update(personRef, {
+        active,
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      batch.set(personRef, {
+        id: person.id,
+        fullName: person.fullName.slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN),
+        warName: person.warName.slice(0, BLUEPRINT_LIMITS.MAX_WAR_NAME_LEN),
+        rank: person.rank.slice(0, BLUEPRINT_LIMITS.MAX_RANK_LEN),
+        company: person.company.slice(0, BLUEPRINT_LIMITS.MAX_COMPANY_LEN),
+        normalizedKey: person.normalizedKey.slice(0, BLUEPRINT_LIMITS.MAX_NORMALIZED_KEY_LEN),
+        active,
+        scaleMode: person.scaleMode ?? 'both',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
     batch.set(doc(db, 'audit_logs', createDocId('log')), {
       action: 'deactivate_personnel',
       scheduleId: person.id,

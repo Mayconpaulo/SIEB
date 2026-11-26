@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Briefcase, MapPin, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { formatShortDatePt } from '../data/initialSchedules';
+import { getRestoredSlice, registerSnapshotProvider } from '../lib/autoUpdate';
 import { formatPersonnelDisplay, parseMilitaryInput } from '../lib/matrixEngine';
 import { SPRING_MODAL, TRANSITION_MICRO } from '../lib/motion';
 import {
@@ -36,6 +37,24 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
   setFeedback,
   onActionError,
 }) => {
+  const restoredMissions = useMemo(
+    () =>
+      getRestoredSlice<{
+        editingMission?: {
+          mode: 'create' | 'edit';
+          original?: MissionRecord;
+          title: string;
+          location: string;
+          startDate: string;
+          endDate: string;
+          personnelIds: string[];
+          notes: string;
+        } | null;
+        missionPersonQuery?: string;
+      }>('missions'),
+    []
+  );
+
   // Mission modal state
   const [editingMission, setEditingMission] = useState<{
     mode: 'create' | 'edit';
@@ -46,8 +65,15 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
     endDate: string;
     personnelIds: string[];
     notes: string;
-  } | null>(null);
-  const [missionPersonQuery, setMissionPersonQuery] = useState('');
+  } | null>(restoredMissions?.editingMission ?? null);
+  const [missionPersonQuery, setMissionPersonQuery] = useState(
+    restoredMissions?.missionPersonQuery ?? ''
+  );
+
+  const missionsSnapshotRef = useRef({ editingMission, missionPersonQuery });
+  missionsSnapshotRef.current = { editingMission, missionPersonQuery };
+
+  useEffect(() => registerSnapshotProvider('missions', () => missionsSnapshotRef.current), []);
 
   // Confirmation modal
   const [confirmDelete, setConfirmDelete] = useState<{

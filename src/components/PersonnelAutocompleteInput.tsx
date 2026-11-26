@@ -7,6 +7,7 @@ import {
   formatPersonnelDisplay,
   parseMilitaryInput,
   searchPersonnelSuggestions,
+  sortMilitaryRanks,
 } from '../lib/matrixEngine';
 import type {
   CalendarDayOverride,
@@ -70,21 +71,21 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
   );
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const excludeSet = useMemo(() => new Set(excludeIds), [excludeIds]);
 
-  const availablePool = useMemo(
-    () => personnel.filter((p) => p.active && !excludeSet.has(p.id)),
-    [personnel, excludeSet]
-  );
+  const availablePool = useMemo(() => {
+    if (!open) return [];
+    return personnel.filter((p) => p.active && !excludeSet.has(p.id));
+  }, [open, personnel, excludeSet]);
 
-  const availableRanks = useMemo(
-    () =>
-      Array.from(new Set(availablePool.map((p) => p.rank.trim()).filter(Boolean))).sort((a, b) =>
-        a.localeCompare(b, 'pt-BR')
-      ),
-    [availablePool]
-  );
+  const availableRanks = useMemo(() => {
+    if (!open) return [];
+    return sortMilitaryRanks(
+      Array.from(new Set(availablePool.map((p) => p.rank.trim()).filter(Boolean)))
+    );
+  }, [open, availablePool]);
 
   // Sync default rank filter when opening dropdown on a fresh cell
   useEffect(() => {
@@ -94,9 +95,11 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
     }
   }, [open, restOrderContext?.defaultRankFilter, availableRanks]);
 
-  // Mode A: Rest-Order ranking (Ordem de Folga: Mais Folgado -> Menos Folgado)
-  const restCandidates = useMemo<RestOrderCandidate[]>(() => {
-    if (!restOrderContext) return [];
+  const trimmedValue = value.trim();
+
+  // Mode A: Rest-Order ranking (Ordem de Folga: Mais Folgado -> Menos Folgado) + progressive prefix filtering
+  const allRestCandidates = useMemo<RestOrderCandidate[]>(() => {
+    if (!open || !restOrderContext) return [];
     return computeRestOrderCandidates({
       personnel: availablePool,
       entriesBySchedule: restOrderContext.entriesBySchedule,
@@ -107,30 +110,69 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
       query: value,
       rankFilter: selectedRankFilter,
       excludeIds,
-    }).slice(0, 14);
-  }, [restOrderContext, availablePool, value, selectedRankFilter, excludeIds]);
+    });
+  }, [open, restOrderContext, availablePool, value, selectedRankFilter, excludeIds]);
 
-  // Mode B: Standard alphabetical/relevance autocomplete (e.g. Missions / Leaves)
+  // Show ALL matching names when user starts typing (progressive narrowing), or top 60 when browsing empty
+  const restCandidates = useMemo(
+    () => allRestCandidates.slice(0, trimmedValue.length > 0 ? 300 : 60),
+    [allRestCandidates, trimmedValue.length]
+  );
+
+  // If a rank chip filtered out all matches while user is typing, count how many match across all ranks
+  const allRanksFallbackCount = useMemo(() => {
+    if (!open || !restOrderContext || !trimmedValue || selectedRankFilter === 'all' || restCandidates.length > 0) {
+      return 0;
+    }
+    return computeRestOrderCandidates({
+      personnel: availablePool,
+      entriesBySchedule: restOrderContext.entriesBySchedule,
+      missions: restOrderContext.missions,
+      calendarDays: restOrderContext.calendarDays,
+      targetDate: restOrderContext.targetDate,
+      isRedScale: restOrderContext.isRedScale,
+      query: value,
+      rankFilter: 'all',
+      excludeIds,
+    }).length;
+  }, [
+    open,
+    restOrderContext,
+    trimmedValue,
+    selectedRankFilter,
+    restCandidates.length,
+    availablePool,
+    value,
+    excludeIds,
+  ]);
+
+  // Mode B: Progressive prefix autocomplete (e.g. Missions)
   const simpleSuggestions = useMemo(() => {
-    if (restOrderContext) return [];
-    return searchPersonnelSuggestions(value, availablePool, { limit: 7 });
-  }, [restOrderContext, value, availablePool]);
+    if (!open || restOrderContext) return [];
+    return searchPersonnelSuggestions(value, availablePool, {
+      limit: trimmedValue.length > 0 ? 200 : 50,
+    });
+  }, [open, restOrderContext, value, availablePool, trimmedValue.length]);
 
   const displayedPeople: PersonnelProfile[] = useMemo(
     () => (restOrderContext ? restCandidates.map((c) => c.person) : simpleSuggestions),
     [restOrderContext, restCandidates, simpleSuggestions]
   );
 
-  const parsedCandidate = useMemo(() => parseMilitaryInput(value), [value]);
+  const parsedCandidate = useMemo(
+    () => (open ? parseMilitaryInput(value) : null),
+    [open, value]
+  );
 
   const hasExactMatch = useMemo(() => {
-    if (!parsedCandidate) return true;
+    if (!open || !parsedCandidate) return true;
+    const upper = trimmedValue.toUpperCase();
     return personnel.some(
       (p) =>
         p.normalizedKey === parsedCandidate.normalizedKey ||
-        formatPersonnelDisplay(p).toUpperCase() === value.trim().toUpperCase()
+        formatPersonnelDisplay(p).toUpperCase() === upper
     );
-  }, [parsedCandidate, personnel, value]);
+  }, [open, parsedCandidate, personnel, trimmedValue]);
 
   const canQuickCreate = Boolean(onQuickCreate && parsedCandidate && !hasExactMatch);
 
@@ -145,8 +187,8 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
     if (!el) return;
     const rect = el.getBoundingClientRect();
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openUpward = spaceBelow < 300 && rect.top > 300;
-    const width = Math.max(rect.width, restOrderContext ? 310 : 236);
+    const openUpward = spaceBelow < 320 && rect.top > 320;
+    const width = Math.max(rect.width, restOrderContext ? 336 : 268);
     const maxLeft = Math.max(8, window.innerWidth - width - 8);
     setDropdownPos({
       top: openUpward ? rect.top - 4 : rect.bottom + 4,
@@ -158,7 +200,18 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
 
   useEffect(() => {
     setHighlightedIdx(0);
+    if (listRef.current) {
+      listRef.current.scrollTop = 0;
+    }
   }, [value, displayedPeople.length, selectedRankFilter]);
+
+  useEffect(() => {
+    if (!showDropdown || !listRef.current) return;
+    const activeOption = listRef.current.querySelector<HTMLElement>(
+      `[data-option-idx="${highlightedIdx}"]`
+    );
+    activeOption?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIdx, showDropdown]);
 
   useEffect(() => {
     if (!showDropdown) return;
@@ -173,6 +226,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
   }, [showDropdown, updatePosition]);
 
   useEffect(() => {
+    if (!open) return;
     const handleOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
@@ -185,7 +239,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
     };
     document.addEventListener('mousedown', handleOutside);
     return () => document.removeEventListener('mousedown', handleOutside);
-  }, []);
+  }, [open]);
 
   const handleSelect = (person: PersonnelProfile) => {
     const formatted = formatPersonnelDisplay(person);
@@ -198,7 +252,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
     if (!onQuickCreate || !parsedCandidate || creating) return;
     setCreating(true);
     try {
-      const created = await onQuickCreate(value.trim());
+      const created = await onQuickCreate(trimmedValue);
       if (created) {
         onChange(formatPersonnelDisplay(created));
         onSelectPerson?.(created);
@@ -276,12 +330,17 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
             className="z-[90] rounded-xl bg-[#0B130F]/98 border border-[#C9A961]/38 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col max-h-80"
           >
             {/* Rest Order Header & Quick Rank Chips */}
-            {restOrderContext && (
+            {restOrderContext ? (
               <div className="px-3 py-2 bg-[#080E0B] border-b border-[#EBE0C8]/12 space-y-1.5 shrink-0">
                 <div className="flex items-center justify-between gap-2 text-[11px]">
                   <span className="font-semibold text-[#F4E6C4] flex items-center gap-1.5">
                     <Clock className="w-3 h-3 text-[#C8A461]" />
-                    <span>Ordem de Folga</span>
+                    <span>
+                      Ordem de Folga
+                      <span className="ml-1.5 font-mono text-[10px] font-normal text-[#98A89F]">
+                        ({allRestCandidates.length})
+                      </span>
+                    </span>
                   </span>
                   <span
                     className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
@@ -330,9 +389,18 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                   </div>
                 )}
               </div>
+            ) : (
+              trimmedValue.length > 0 && (
+                <div className="px-3 py-1.5 bg-[#080E0B] border-b border-[#EBE0C8]/12 flex items-center justify-between text-[10px] text-[#98A89F] font-mono shrink-0">
+                  <span>Efetivo filtrado</span>
+                  <span className="text-[#E5C17B] font-semibold">
+                    {simpleSuggestions.length} {simpleSuggestions.length === 1 ? 'militar' : 'militares'}
+                  </span>
+                </div>
+              )
             )}
 
-            <div className="overflow-y-auto schedule-scroll py-1 flex-1">
+            <div ref={listRef} className="overflow-y-auto schedule-scroll py-1 flex-1">
               {restOrderContext
                 ? restCandidates.map((cand, idx) => {
                     const isHighlighted = idx === highlightedIdx;
@@ -340,12 +408,15 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                       cand.eligibleForScale && !cand.busyOnTargetDate
                         ? ++eligibleOrderCounter
                         : null;
+                    const showFullName =
+                      cand.person.fullName.toUpperCase() !== cand.person.warName.toUpperCase();
 
                     return (
                       <button
                         key={cand.person.id}
                         type="button"
                         role="option"
+                        data-option-idx={idx}
                         aria-selected={isHighlighted}
                         onMouseDown={(e) => {
                           e.preventDefault();
@@ -362,7 +433,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span
-                            className={`font-mono text-[10px] font-bold w-5 shrink-0 text-center ${
+                            className={`font-mono text-[10px] font-bold w-6 shrink-0 text-center ${
                               rankPosition === 1
                                 ? 'text-[#E5C17B]'
                                 : rankPosition !== null
@@ -376,9 +447,11 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                             <div className="font-semibold truncate">
                               {formatPersonnelDisplay(cand.person)}
                             </div>
-                            {cand.person.company && (
+                            {(showFullName || cand.person.company) && (
                               <div className="text-[10px] text-[#7D8F85] truncate">
-                                {cand.person.company}
+                                {[showFullName ? cand.person.fullName : null, cand.person.company || null]
+                                  .filter(Boolean)
+                                  .join(' · ')}
                               </div>
                             )}
                           </div>
@@ -429,6 +502,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                         key={person.id}
                         type="button"
                         role="option"
+                        data-option-idx={idx}
                         aria-selected={isHighlighted}
                         onMouseDown={(e) => {
                           e.preventDefault();
@@ -464,15 +538,28 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                     );
                   })}
 
-              {restOrderContext && restCandidates.length === 0 && !canQuickCreate && (
-                <div className="px-3 py-3 text-xs text-[#98A89F] text-center">
-                  Nenhum militar encontrado para este filtro.
+              {restOrderContext && restCandidates.length === 0 && (
+                <div className="px-3 py-3 text-xs text-[#98A89F] text-center space-y-2">
+                  <div>Nenhum militar encontrado em {selectedRankFilter === 'all' ? 'todo o efetivo' : selectedRankFilter}.</div>
+                  {allRanksFallbackCount > 0 && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setSelectedRankFilter('all');
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#C8A461]/20 hover:bg-[#C8A461]/30 border border-[#C8A461]/45 text-[#F4E6C4] text-[11px] font-medium cursor-pointer transition-colors"
+                    >
+                      <span>Ver em todas as graduações ({allRanksFallbackCount})</span>
+                    </button>
+                  )}
                 </div>
               )}
 
               {canQuickCreate && parsedCandidate && (
                 <button
                   type="button"
+                  data-option-idx={displayedPeople.length}
                   disabled={creating}
                   onMouseDown={(e) => {
                     e.preventDefault();
@@ -500,3 +587,4 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
     </div>
   );
 };
+

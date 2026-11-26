@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -29,6 +29,13 @@ import {
   slugifyId,
 } from '../data/initialSchedules';
 import {
+  clearWorkingDraft,
+  getRestoredSlice,
+  loadWorkingDraft,
+  registerSnapshotProvider,
+  saveWorkingDraft,
+} from '../lib/autoUpdate';
+import {
   formatPersonnelDisplay,
   inferRankFilterFromScheduleContext,
   parseMilitaryInput,
@@ -42,8 +49,10 @@ import {
 } from '../lib/motion';
 import {
   autoRegisterPersonnelFromScheduleCells,
+  countPendingBattalionSync,
   createPersonnelProfile,
   saveCalendarDayOverride,
+  syncBattalionPersonnelToFirestore,
   updatePersonnelScaleMode,
 } from '../lib/personnelService';
 import {
@@ -81,6 +90,7 @@ interface AdminDashboardProps {
   schedules: ScheduleModel[];
   entriesBySchedule: Record<string, ScheduleEntry[]>;
   personnel: PersonnelProfile[];
+  personnelLoaded: boolean;
   missions: MissionRecord[];
   calendarDays: Record<string, CalendarDayOverride>;
   auditLogs: AuditLogEntry[];
@@ -113,6 +123,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   schedules,
   entriesBySchedule,
   personnel,
+  personnelLoaded,
   missions,
   calendarDays,
   auditLogs,
@@ -120,19 +131,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onSessionExpired,
   onExitAdmin,
 }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('entries');
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string>(schedules[0]?.id ?? '');
+  const restoredAdmin = useMemo(
+    () =>
+      getRestoredSlice<{
+        activeTab?: AdminTab;
+        selectedScheduleId?: string;
+        showPreviewModal?: boolean;
+        showPeriodModal?: boolean;
+        periodStart?: string;
+        periodEnd?: string;
+        editingModel?: {
+          mode: 'create' | 'edit';
+          id: string;
+          name: string;
+          shortCode: string;
+          description: string;
+          order: number;
+          columns: ScheduleColumn[];
+          initialStart: string;
+          initialEnd: string;
+        } | null;
+      }>('adminDashboard'),
+    []
+  );
+
+  const [activeTab, setActiveTab] = useState<AdminTab>(restoredAdmin?.activeTab ?? 'entries');
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>(
+    restoredAdmin?.selectedScheduleId ?? schedules[0]?.id ?? ''
+  );
   const [busyMessage, setBusyMessage] = useState('');
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Draft entries state for inline editing + preview before saving
   const [draftEntries, setDraftEntries] = useState<ScheduleEntry[]>([]);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(
+    restoredAdmin?.showPreviewModal ?? false
+  );
 
   // Add period modal
-  const [showPeriodModal, setShowPeriodModal] = useState(false);
-  const [periodStart, setPeriodStart] = useState('2026-12-02');
-  const [periodEnd, setPeriodEnd] = useState('2026-12-31');
+  const [showPeriodModal, setShowPeriodModal] = useState(restoredAdmin?.showPeriodModal ?? false);
+  const [periodStart, setPeriodStart] = useState(restoredAdmin?.periodStart ?? '2026-12-02');
+  const [periodEnd, setPeriodEnd] = useState(restoredAdmin?.periodEnd ?? '2026-12-31');
 
   // Rename single entry date modal
   const [renamingEntry, setRenamingEntry] = useState<ScheduleEntry | null>(null);
@@ -157,7 +196,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     columns: ScheduleColumn[];
     initialStart: string;
     initialEnd: string;
-  } | null>(null);
+  } | null>(restoredAdmin?.editingModel ?? null);
 
   const selectedSchedule =
     schedules.find((s) => s.id === selectedScheduleId) ?? schedules[0] ?? null;
@@ -168,20 +207,115 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [schedules, selectedSchedule]);
 
+  // Automatically persist the official battalion roster into Firestore once per admin session
+  const battalionSyncAttemptedRef = useRef(false);
+  useEffect(() => {
+    if (!personnelLoaded || battalionSyncAttemptedRef.current) return;
+    const pending = countPendingBattalionSync(personnel);
+    if (pending <= 0) {
+      battalionSyncAttemptedRef.current = true;
+      return;
+    }
+    battalionSyncAttemptedRef.current = true;
+    let cancelled = false;
+    setBusyMessage(`Sincronizando efetivo do batalhão no banco online (${pending})...`);
+    void syncBattalionPersonnelToFirestore(adminToken, personnel)
+      .then(({ created, updated }) => {
+        if (cancelled) return;
+        if (created > 0 || updated > 0) {
+          setFeedback({
+            type: 'success',
+            text: `Relação oficial do batalhão sincronizada no banco online (${created} cadastrado(s), ${updated} atualizado(s)).`,
+          });
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        handleActionError(err);
+      })
+      .finally(() => {
+        if (!cancelled) setBusyMessage('');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [personnelLoaded, personnel, adminToken]);
+
   const savedEntries = useMemo(
     () => (selectedSchedule ? entriesBySchedule[selectedSchedule.id] ?? [] : []),
     [selectedSchedule, entriesBySchedule]
   );
 
-  // Reset draft whenever switching schedules or after cloud updates
+  const draftStorageKey = selectedSchedule ? `schedule_draft_${selectedSchedule.id}` : '';
+
+  // Hydrate draft from savedEntries + merge any unsaved working draft changes seamlessly
   useEffect(() => {
+    const base = savedEntries.map((e) => ({
+      ...e,
+      assignments: { ...e.assignments },
+    }));
+
+    if (!draftStorageKey) {
+      setDraftEntries(base);
+      return;
+    }
+
+    const storedPatches = loadWorkingDraft<
+      Record<
+        string,
+        {
+          isRedScale?: boolean;
+          holidayLabel?: string;
+          notes?: string;
+          assignments?: Record<string, string>;
+        }
+      >
+    >(draftStorageKey);
+
+    if (!storedPatches || Object.keys(storedPatches).length === 0) {
+      setDraftEntries(base);
+      return;
+    }
+
     setDraftEntries(
-      savedEntries.map((e) => ({
-        ...e,
-        assignments: { ...e.assignments },
-      }))
+      base.map((row) => {
+        const patch = storedPatches[row.date];
+        if (!patch) return row;
+        return {
+          ...row,
+          isRedScale: patch.isRedScale ?? row.isRedScale,
+          holidayLabel: patch.holidayLabel ?? row.holidayLabel,
+          notes: patch.notes ?? row.notes,
+          assignments: {
+            ...row.assignments,
+            ...(patch.assignments ?? {}),
+          },
+        };
+      })
     );
-  }, [savedEntries]);
+  }, [savedEntries, draftStorageKey]);
+
+  const adminSnapshotRef = useRef({
+    activeTab,
+    selectedScheduleId,
+    showPreviewModal,
+    showPeriodModal,
+    periodStart,
+    periodEnd,
+    editingModel,
+  });
+  adminSnapshotRef.current = {
+    activeTab,
+    selectedScheduleId,
+    showPreviewModal,
+    showPeriodModal,
+    periodStart,
+    periodEnd,
+    editingModel,
+  };
+
+  useEffect(() => registerSnapshotProvider('adminDashboard', () => adminSnapshotRef.current), []);
 
   // Compute exact cell-by-cell diff for preview before saving
   const pendingDiffs = useMemo<DiffItem[]>(() => {
@@ -244,6 +378,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }, [draftEntries, savedEntries, selectedSchedule]);
 
   const modifiedDatesSet = useMemo(() => new Set(pendingDiffs.map((d) => d.date)), [pendingDiffs]);
+
+  // Continuously persist unsaved schedule cell edits so an auto-update reload never loses typed cells
+  useEffect(() => {
+    if (!draftStorageKey || !selectedSchedule || savedEntries.length === 0) return;
+
+    const savedByDate = new Map(savedEntries.map((e) => [e.date, e]));
+    const patches: Record<
+      string,
+      {
+        isRedScale?: boolean;
+        holidayLabel?: string;
+        notes?: string;
+        assignments?: Record<string, string>;
+      }
+    > = {};
+
+    for (const draft of draftEntries) {
+      const orig = savedByDate.get(draft.date);
+      if (!orig) continue;
+      const changedAssignments: Record<string, string> = {};
+      for (const col of selectedSchedule.columns) {
+        const beforeVal = (orig.assignments[col.id] ?? '').trim();
+        const afterVal = (draft.assignments[col.id] ?? '').trim();
+        if (beforeVal !== afterVal) {
+          changedAssignments[col.id] = draft.assignments[col.id] ?? '';
+        }
+      }
+      const hasMetaChange =
+        draft.isRedScale !== orig.isRedScale ||
+        draft.holidayLabel.trim() !== orig.holidayLabel.trim() ||
+        draft.notes.trim() !== orig.notes.trim();
+
+      if (hasMetaChange || Object.keys(changedAssignments).length > 0) {
+        patches[draft.date] = {
+          ...(draft.isRedScale !== orig.isRedScale ? { isRedScale: draft.isRedScale } : {}),
+          ...(draft.holidayLabel.trim() !== orig.holidayLabel.trim()
+            ? { holidayLabel: draft.holidayLabel }
+            : {}),
+          ...(draft.notes.trim() !== orig.notes.trim() ? { notes: draft.notes } : {}),
+          ...(Object.keys(changedAssignments).length > 0 ? { assignments: changedAssignments } : {}),
+        };
+      }
+    }
+
+    if (Object.keys(patches).length > 0) {
+      saveWorkingDraft(draftStorageKey, patches);
+    } else {
+      clearWorkingDraft(draftStorageKey);
+    }
+  }, [draftEntries, savedEntries, selectedSchedule, draftStorageKey]);
 
   const handleActionError = (err: unknown) => {
     const msg = err instanceof Error ? err.message : 'Erro ao gravar alterações.';
@@ -456,6 +640,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         summary,
         details
       );
+      if (draftStorageKey) {
+        clearWorkingDraft(draftStorageKey);
+      }
       setShowPreviewModal(false);
       setFeedback({
         type: 'success',
@@ -857,11 +1044,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {pendingDiffs.length > 0 && (
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (draftStorageKey) {
+                        clearWorkingDraft(draftStorageKey);
+                      }
                       setDraftEntries(
                         savedEntries.map((e) => ({ ...e, assignments: { ...e.assignments } }))
-                      )
-                    }
+                      );
+                    }}
                     className="btl-btn btl-btn-secondary min-h-[40px] px-3 py-1.5 text-xs sm:text-sm"
                   >
                     Descartar ({pendingDiffs.length})
@@ -1090,6 +1280,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <AdminPersonnelTab
               adminToken={adminToken}
               personnel={personnel}
+              personnelLoaded={personnelLoaded}
               busyMessage={busyMessage}
               setBusyMessage={setBusyMessage}
               setFeedback={setFeedback}

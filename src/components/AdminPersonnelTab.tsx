@@ -1,6 +1,7 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  CloudUpload,
   FileSpreadsheet,
   Pencil,
   Plus,
@@ -11,17 +12,23 @@ import {
   X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { getRestoredSlice, registerSnapshotProvider } from '../lib/autoUpdate';
 import {
   buildImportMergePlan,
   formatPersonnelDisplay,
   normalizeMilitaryText,
   parseMilitaryInput,
+  parseProgressiveSearchQuery,
+  scoreProgressivePersonnelMatch,
+  sortMilitaryRanks,
 } from '../lib/matrixEngine';
 import { SPRING_MODAL, TRANSITION_MICRO } from '../lib/motion';
 import {
+  countPendingBattalionSync,
   createPersonnelProfile,
   importPersonnelBatch,
   setPersonnelActiveStatus,
+  syncBattalionPersonnelToFirestore,
   updatePersonnelProfile,
 } from '../lib/personnelService';
 import {
@@ -37,6 +44,7 @@ import {
 interface AdminPersonnelTabProps {
   adminToken: string;
   personnel: PersonnelProfile[];
+  personnelLoaded?: boolean;
   busyMessage: string;
   setBusyMessage: (msg: string) => void;
   setFeedback: (fb: { type: 'success' | 'error'; text: string } | null) => void;
@@ -137,14 +145,36 @@ function parsePlainTextLines(text: string): ImportRowCandidate[] {
 export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
   adminToken,
   personnel,
+  personnelLoaded = false,
   busyMessage,
   setBusyMessage,
   setFeedback,
   onActionError,
 }) => {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
-  const [rankFilter, setRankFilter] = useState('all');
+  const restoredPersonnel = useMemo(
+    () =>
+      getRestoredSlice<{
+        search?: string;
+        statusFilter?: 'active' | 'inactive' | 'all';
+        rankFilter?: string;
+        editingPerson?: {
+          mode: 'create' | 'edit';
+          original?: PersonnelProfile;
+          fullName: string;
+          warName: string;
+          rank: string;
+          company: string;
+          scaleMode: PersonnelScaleMode;
+        } | null;
+      }>('personnel'),
+    []
+  );
+
+  const [search, setSearch] = useState(restoredPersonnel?.search ?? '');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>(
+    restoredPersonnel?.statusFilter ?? 'active'
+  );
+  const [rankFilter, setRankFilter] = useState(restoredPersonnel?.rankFilter ?? 'all');
 
   const [editingPerson, setEditingPerson] = useState<{
     mode: 'create' | 'edit';
@@ -154,7 +184,12 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
     rank: string;
     company: string;
     scaleMode: PersonnelScaleMode;
-  } | null>(null);
+  } | null>(restoredPersonnel?.editingPerson ?? null);
+
+  const personnelSnapshotRef = useRef({ search, statusFilter, rankFilter, editingPerson });
+  personnelSnapshotRef.current = { search, statusFilter, rankFilter, editingPerson };
+
+  useEffect(() => registerSnapshotProvider('personnel', () => personnelSnapshotRef.current), []);
 
   const [showImportModal, setShowImportModal] = useState(false);
   const [pasteText, setPasteText] = useState('');
@@ -162,24 +197,80 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
   const [importFileName, setImportFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [visibleCount, setVisibleCount] = useState(100);
+
+  useEffect(() => {
+    setVisibleCount(100);
+  }, [search, statusFilter, rankFilter]);
+
   const availableRanks = useMemo(
-    () => Array.from(new Set(personnel.map((p) => p.rank).filter(Boolean))).sort(),
+    () => sortMilitaryRanks(Array.from(new Set(personnel.map((p) => p.rank).filter(Boolean)))),
     [personnel]
   );
 
+  const pendingSyncCount = useMemo(
+    () => (personnelLoaded ? countPendingBattalionSync(personnel) : 0),
+    [personnel, personnelLoaded]
+  );
+
+  const handleManualSyncBattalion = async () => {
+    if (pendingSyncCount <= 0) return;
+    setBusyMessage(`Sincronizando ${pendingSyncCount} militar(es) no banco online...`);
+    setFeedback(null);
+    try {
+      const { created, updated } = await syncBattalionPersonnelToFirestore(adminToken, personnel);
+      setFeedback({
+        type: 'success',
+        text: `Efetivo sincronizado no banco online: ${created} cadastrado(s), ${updated} atualizado(s).`,
+      });
+    } catch (err) {
+      onActionError(err);
+    } finally {
+      setBusyMessage('');
+    }
+  };
+
   const filtered = useMemo(() => {
-    const q = normalizeMilitaryText(search);
-    return personnel.filter((p) => {
-      if (statusFilter === 'active' && !p.active) return false;
-      if (statusFilter === 'inactive' && p.active) return false;
-      if (rankFilter !== 'all' && p.rank !== rankFilter) return false;
-      if (q) {
-        const hay = normalizeMilitaryText(`${p.rank} ${p.warName} ${p.fullName} ${p.company}`);
-        if (!hay.includes(q)) return false;
+    const parsedQuery = parseProgressiveSearchQuery(search);
+    const rawNorm = normalizeMilitaryText(search);
+    const matched: { person: PersonnelProfile; score: number }[] = [];
+
+    for (const p of personnel) {
+      if (statusFilter === 'active' && !p.active) continue;
+      if (statusFilter === 'inactive' && p.active) continue;
+      if (rankFilter !== 'all' && p.rank !== rankFilter) continue;
+
+      if (rawNorm) {
+        const progressiveScore = scoreProgressivePersonnelMatch(p, parsedQuery);
+        if (progressiveScore !== null) {
+          matched.push({ person: p, score: progressiveScore });
+        } else if (
+          rawNorm.length >= 2 &&
+          normalizeMilitaryText(p.company).includes(rawNorm)
+        ) {
+          matched.push({ person: p, score: 5 });
+        }
+      } else {
+        matched.push({ person: p, score: 0 });
       }
-      return true;
-    });
+    }
+
+    if (rawNorm) {
+      matched.sort(
+        (a, b) =>
+          a.score - b.score ||
+          a.person.warName.localeCompare(b.person.warName, 'pt-BR') ||
+          a.person.fullName.localeCompare(b.person.fullName, 'pt-BR')
+      );
+    }
+
+    return matched.map((m) => m.person);
   }, [personnel, search, statusFilter, rankFilter]);
+
+  const visiblePersonnel = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  );
 
   const handleSavePerson = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -325,6 +416,17 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {pendingSyncCount > 0 && (
+            <button
+              type="button"
+              disabled={Boolean(busyMessage)}
+              onClick={() => void handleManualSyncBattalion()}
+              className="btl-btn btl-btn-secondary text-xs sm:text-sm"
+            >
+              <CloudUpload className="w-4 h-4 text-[#A8D8BE]" />
+              <span>Sincronizar efetivo ({pendingSyncCount})</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -414,7 +516,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
-                {filtered.map((p) => {
+                {visiblePersonnel.map((p) => {
                   const mode = p.scaleMode ?? 'both';
                   return (
                     <tr key={p.id} className="hover:bg-[#E4EAE6]/[0.03] transition-colors">
@@ -498,6 +600,29 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
               </tbody>
             </table>
           </div>
+          {filtered.length > visibleCount && (
+            <div className="px-4 py-3 bg-[#0B120E]/85 border-t border-[#EBE0C8]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+              <span className="font-mono tabular-nums">
+                Exibindo {visiblePersonnel.length} de {filtered.length} militares
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((c) => c + 100)}
+                  className="btl-btn btl-btn-secondary min-h-[34px] px-3 py-1 text-xs"
+                >
+                  Carregar mais (+100)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount(filtered.length)}
+                  className="btl-btn btl-btn-secondary min-h-[34px] px-3 py-1 text-xs"
+                >
+                  Mostrar todos ({filtered.length})
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

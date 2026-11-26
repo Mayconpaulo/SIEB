@@ -155,9 +155,37 @@ export function formatPersonnelDisplay(person: Pick<PersonnelProfile, 'rank' | '
   return person.rank ? `${person.rank} ${person.warName}` : person.warName;
 }
 
+const RANK_ORDER: Record<string, number> = {
+  Cel: 1,
+  'Ten Cel': 2,
+  Maj: 3,
+  Cap: 4,
+  '1º Ten': 5,
+  '2º Ten': 6,
+  'Asp Of': 7,
+  Subten: 8,
+  '1º Sgt': 9,
+  '2º Sgt': 10,
+  '3º Sgt': 11,
+  Cb: 12,
+  'Sd EP': 13,
+  Sd: 14,
+  'Sd EV': 15,
+};
+
+/** Sorts military ranks in official hierarchy order (Cel -> Sd EV), then alphabetically */
+export function sortMilitaryRanks(ranks: string[]): string[] {
+  return [...ranks].sort((a, b) => {
+    const oa = RANK_ORDER[a] ?? 99;
+    const ob = RANK_ORDER[b] ?? 99;
+    if (oa !== ob) return oa - ob;
+    return a.localeCompare(b, 'pt-BR');
+  });
+}
+
 /**
  * Deduplication lookup: checks whether a candidate military profile already exists
- * in the centralized personnel base (exact normalizedKey, warName, or fullName match).
+ * in the centralized personnel base without collapsing distinct soldiers who share a warName.
  */
 export function findMatchingPersonnel(
   candidate: { fullName?: string; warName?: string; rank?: string },
@@ -166,16 +194,40 @@ export function findMatchingPersonnel(
   const candWarKey = buildNormalizedKey(candidate.warName ?? '');
   const candFullKey = buildNormalizedKey(candidate.fullName ?? '');
   const candRank = normalizeRankLabel(candidate.rank ?? '');
+  const candHasDistinctFullName = Boolean(candFullKey && candWarKey && candFullKey !== candWarKey);
 
   if (!candWarKey && !candFullKey) return undefined;
 
-  // Pass 1: Exact normalizedKey match (prefer same rank if multiple share exact warName)
-  const exactMatches = personnel.filter(
-    (p) =>
-      (candWarKey && p.normalizedKey === candWarKey) ||
+  // Pass 0: Exact fullName match (strongest identity for homonyms like two "Cb MATHEUS SILVA")
+  if (candHasDistinctFullName) {
+    const fullMatches = personnel.filter((p) => buildNormalizedKey(p.fullName) === candFullKey);
+    if (fullMatches.length === 1) return fullMatches[0];
+    if (fullMatches.length > 1) {
+      if (candRank) {
+        const rankMatch = fullMatches.find((p) => normalizeRankLabel(p.rank) === candRank);
+        if (rankMatch) return rankMatch;
+      }
+      return fullMatches[0];
+    }
+  }
+
+  // Pass 1: Exact normalizedKey / warName match
+  const exactMatches = personnel.filter((p) => {
+    const pWarKey = buildNormalizedKey(p.warName);
+    const pFullKey = buildNormalizedKey(p.fullName);
+    const pHasDistinctFullName = Boolean(pFullKey && pWarKey && pFullKey !== pWarKey);
+
+    // Never collapse two people who BOTH have distinct, different full names
+    if (candHasDistinctFullName && pHasDistinctFullName && candFullKey !== pFullKey) {
+      return false;
+    }
+
+    return (
+      (candWarKey && (p.normalizedKey === candWarKey || pWarKey === candWarKey)) ||
       (candFullKey && p.normalizedKey === candFullKey) ||
-      (candFullKey && buildNormalizedKey(p.fullName) === candFullKey)
-  );
+      (candFullKey && pFullKey === candFullKey)
+    );
+  });
 
   if (exactMatches.length === 1) {
     return exactMatches[0];
@@ -188,10 +240,11 @@ export function findMatchingPersonnel(
     return exactMatches[0];
   }
 
-  // Pass 2: Match where incoming warName equals existing fullName or vice-versa (only when unambiguous)
+  // Pass 2: Cross-match where incoming warName equals existing fullName or vice-versa (only when unambiguous)
   const crossMatches = personnel.filter((p) => {
     const pWar = buildNormalizedKey(p.warName);
     const pFull = buildNormalizedKey(p.fullName);
+    if (candHasDistinctFullName && pFull !== pWar && candFullKey !== pFull) return false;
     if (candWarKey && pFull === candWarKey) return true;
     if (candFullKey && pWar === candFullKey) return true;
     return false;
@@ -208,9 +261,128 @@ export function findMatchingPersonnel(
 }
 
 /**
- * Real-time autocomplete suggestions:
- * - Typing "P" returns personnel whose warName or fullName starts with "P" first, then word-starts, then contains.
- * - Typing "Paulo" matches "3º Sgt PAULO SILVA", etc.
+ * Parses an interactive search/autocomplete query that may have:
+ * - Just 1+ letters of a name (e.g. "P", "PA", "PAU", "PAULO")
+ * - Only a rank (e.g. "3º Sgt", "Cb", "Sd EV")
+ * - A rank followed by 1+ letters of a name (e.g. "3º Sgt P", "Cb MA")
+ */
+export function parseProgressiveSearchQuery(rawQuery: string): {
+  rankFilter: string;
+  nameNeedle: string;
+  fullNeedle: string;
+} {
+  const trimmed = rawQuery.replace(/^\*+\s*/, '').replace(/\s+/g, ' ').trim();
+  const fullNeedle = normalizeMilitaryText(trimmed);
+  if (!trimmed) {
+    return { rankFilter: '', nameNeedle: '', fullNeedle: '' };
+  }
+
+  // Check if query starts with a known rank followed by space and 1+ name chars (or exact rank)
+  for (const { regex, canonical } of RANK_PATTERNS) {
+    const match = trimmed.match(regex);
+    if (match) {
+      const rest = trimmed.slice(match[0].length).trim();
+      return {
+        rankFilter: canonical,
+        nameNeedle: normalizeMilitaryText(rest),
+        fullNeedle,
+      };
+    }
+  }
+
+  // Check exact rank without trailing space (e.g. "Cb", "3º Sgt", "Sd EV", "ST")
+  for (const { regex, canonical } of RANK_PATTERNS) {
+    if (regex.test(`${trimmed} `)) {
+      return {
+        rankFilter: canonical,
+        nameNeedle: '',
+        fullNeedle,
+      };
+    }
+  }
+
+  return {
+    rankFilter: '',
+    nameNeedle: fullNeedle,
+    fullNeedle,
+  };
+}
+
+/**
+ * Scores how well a soldier matches a progressive typing query:
+ * - 100: exact warName / fullName / display match
+ * - 90: warName starts with needle (e.g. "P" -> "PAULO SILVA", "PA" -> "PAULO SILVA")
+ * - 80: any word inside warName starts with needle (e.g. "S" -> "PAULO SILVA")
+ * - 70: fullName starts with needle (e.g. "M" -> "MAYCON PAULO SILVA DOS SANTOS")
+ * - 60: any word inside fullName starts with needle
+ * - 50: rank-only query matched soldier's rank
+ * - 0: no prefix match (never pollutes 1-2 letter typing with mid-word substrings!)
+ */
+export function scoreProgressivePersonnelMatch(
+  person: PersonnelProfile,
+  parsed: { rankFilter: string; nameNeedle: string; fullNeedle: string },
+  allowSubstringFallback = false
+): number {
+  if (!parsed.fullNeedle) return 1;
+
+  const war = normalizeMilitaryText(person.warName);
+  const full = normalizeMilitaryText(person.fullName);
+  const rankNorm = normalizeMilitaryText(person.rank);
+  const display = normalizeMilitaryText(formatPersonnelDisplay(person));
+
+  if (parsed.rankFilter) {
+    const targetRankNorm = normalizeMilitaryText(parsed.rankFilter);
+    const rankMatches =
+      rankNorm === targetRankNorm ||
+      (targetRankNorm === 'SD' && rankNorm.startsWith('SD'));
+
+    if (!parsed.nameNeedle) {
+      // User typed only a rank (e.g. "Cb" or "Sd") -> match rank OR warName starting with those letters
+      if (rankMatches) return 50;
+      if (war.startsWith(parsed.fullNeedle)) return 90;
+      if (full.startsWith(parsed.fullNeedle)) return 70;
+      return 0;
+    }
+
+    if (!rankMatches) return 0;
+  }
+
+  const needle = parsed.nameNeedle || parsed.fullNeedle;
+  if (!needle) return 50;
+
+  if (war === needle || full === needle || display === parsed.fullNeedle) {
+    return 100;
+  }
+  if (war.startsWith(needle)) {
+    return 90;
+  }
+  if (war.split(' ').some((w) => w.startsWith(needle))) {
+    return 80;
+  }
+  if (full.startsWith(needle)) {
+    return 70;
+  }
+  if (full.split(' ').some((w) => w.startsWith(needle))) {
+    return 60;
+  }
+  if (display.startsWith(parsed.fullNeedle)) {
+    return 55;
+  }
+
+  if (
+    allowSubstringFallback &&
+    needle.length >= 3 &&
+    (war.includes(needle) || full.includes(needle) || display.includes(parsed.fullNeedle))
+  ) {
+    return 30;
+  }
+
+  return 0;
+}
+
+/**
+ * Real-time progressive prefix autocomplete suggestions:
+ * - Typing "P" returns ALL soldiers whose warName/fullName starts with "P", narrowing down as more letters are typed.
  */
 export function searchPersonnelSuggestions(
   query: string,
@@ -218,7 +390,7 @@ export function searchPersonnelSuggestions(
   options?: { includeInactive?: boolean; limit?: number }
 ): PersonnelProfile[] {
   const includeInactive = options?.includeInactive ?? false;
-  const limit = options?.limit ?? 8;
+  const limit = options?.limit ?? 120;
 
   const pool = includeInactive ? personnel : personnel.filter((p) => p.active);
   const rawTrimmed = query.trim();
@@ -226,42 +398,31 @@ export function searchPersonnelSuggestions(
     return pool.slice(0, limit);
   }
 
-  const parsed = parseMilitaryInput(rawTrimmed);
-  const needle = normalizeMilitaryText(parsed ? parsed.warName : rawTrimmed);
-  const fullNeedle = normalizeMilitaryText(rawTrimmed);
-
-  const scored: { person: PersonnelProfile; score: number }[] = [];
+  const parsed = parseProgressiveSearchQuery(rawTrimmed);
+  let scored: { person: PersonnelProfile; score: number }[] = [];
 
   for (const person of pool) {
-    const war = normalizeMilitaryText(person.warName);
-    const full = normalizeMilitaryText(person.fullName);
-    const display = normalizeMilitaryText(formatPersonnelDisplay(person));
-
-    let score = 0;
-    if (war === needle || full === needle || display === fullNeedle) {
-      score = 100;
-    } else if (war.startsWith(needle) || full.startsWith(needle)) {
-      score = 80;
-    } else if (display.startsWith(fullNeedle)) {
-      score = 75;
-    } else if (
-      war.split(' ').some((w) => w.startsWith(needle)) ||
-      full.split(' ').some((w) => w.startsWith(needle))
-    ) {
-      score = 60;
-    } else if (war.includes(needle) || full.includes(needle) || display.includes(fullNeedle)) {
-      score = 40;
-    }
-
+    const score = scoreProgressivePersonnelMatch(person, parsed, false);
     if (score > 0) {
       scored.push({ person, score });
+    }
+  }
+
+  // Fallback to substring search only for 3+ char queries that produced zero prefix matches
+  if (scored.length === 0 && parsed.nameNeedle.length >= 3) {
+    for (const person of pool) {
+      const score = scoreProgressivePersonnelMatch(person, parsed, true);
+      if (score > 0) {
+        scored.push({ person, score });
+      }
     }
   }
 
   scored.sort(
     (a, b) =>
       b.score - a.score ||
-      a.person.warName.localeCompare(b.person.warName, 'pt-BR')
+      a.person.warName.localeCompare(b.person.warName, 'pt-BR') ||
+      a.person.fullName.localeCompare(b.person.fullName, 'pt-BR')
   );
 
   return scored.slice(0, limit).map((s) => s.person);
@@ -286,8 +447,9 @@ export function buildImportMergePlan(
 
     if (fullName.length < 2 && warName.length < 2) continue;
     const normalizedKey = buildNormalizedKey(warName, fullName);
-    if (!normalizedKey || seenKeysInBatch.has(normalizedKey)) continue;
-    seenKeysInBatch.add(normalizedKey);
+    const batchUniqueKey = `${normalizeMilitaryText(rank)}|${buildNormalizedKey(fullName || warName)}|${normalizedKey}`;
+    if (!normalizedKey || seenKeysInBatch.has(batchUniqueKey)) continue;
+    seenKeysInBatch.add(batchUniqueKey);
 
     const candidate: ImportRowCandidate = {
       fullName: fullName || warName,
@@ -679,9 +841,9 @@ export function buildDynamicMatrix(params: {
   }
 
   // Collect available rank & company filters from all personnel
-  const availableRanks = Array.from(
-    new Set(personnel.map((p) => p.rank.trim()).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  const availableRanks = sortMilitaryRanks(
+    Array.from(new Set(personnel.map((p) => p.rank.trim()).filter(Boolean)))
+  );
 
   const availableCompanies = Array.from(
     new Set(personnel.map((p) => p.company.trim()).filter(Boolean))
@@ -936,73 +1098,72 @@ export function computeRestOrderCandidates(params: {
     }
   }
 
-  // Optional text query filtering (supports typing rank, war name, or full name)
+  // Progressive prefix query filtering (works from the very first letter typed, e.g. "A", "P", "Cb M")
   const rawQuery = query.trim();
-  const fullNeedle = normalizeMilitaryText(rawQuery);
-  const parsedQuery = rawQuery ? parseMilitaryInput(rawQuery) : null;
-  const parsedRankFromQuery = rawQuery ? normalizeRankLabel(rawQuery) : '';
-  const queryMatchesOnlyRank =
-    Boolean(rawQuery) &&
-    !parsedQuery &&
-    activePool.some((p) => normalizeMilitaryText(p.rank) === normalizeMilitaryText(parsedRankFromQuery));
+  const parsedSearch = parseProgressiveSearchQuery(rawQuery);
+  const hasExplicitTypedRank = Boolean(parsedSearch.rankFilter);
 
-  const candidates: RestOrderCandidate[] = [];
+  const collectCandidates = (allowSubstringFallback: boolean) => {
+    const list: { candidate: RestOrderCandidate; matchScore: number }[] = [];
 
-  for (const person of activePool) {
-    if (rankFilter !== 'all' && person.rank !== rankFilter) {
-      continue;
-    }
-
-    if (rawQuery) {
-      const war = normalizeMilitaryText(person.warName);
-      const full = normalizeMilitaryText(person.fullName);
-      const display = normalizeMilitaryText(formatPersonnelDisplay(person));
-      const rankNorm = normalizeMilitaryText(person.rank);
-
-      let matchesQuery = false;
-      if (queryMatchesOnlyRank) {
-        matchesQuery = rankNorm === normalizeMilitaryText(parsedRankFromQuery);
-      } else {
-        const needle = normalizeMilitaryText(parsedQuery ? parsedQuery.warName : rawQuery);
-        const rankRequired = parsedQuery?.rank ? normalizeMilitaryText(parsedQuery.rank) : '';
-        const nameMatch =
-          war.includes(needle) || full.includes(needle) || display.includes(fullNeedle);
-        matchesQuery = rankRequired
-          ? nameMatch && rankNorm === rankRequired
-          : nameMatch || rankNorm.includes(fullNeedle);
+    for (const person of activePool) {
+      // Honor chip rankFilter unless the user explicitly typed a rank in the text box (e.g. "Cb P")
+      if (!hasExplicitTypedRank && rankFilter !== 'all' && person.rank !== rankFilter) {
+        continue;
       }
 
-      if (!matchesQuery) continue;
+      let matchScore = 1;
+      if (rawQuery) {
+        matchScore = scoreProgressivePersonnelMatch(person, parsedSearch, allowSubstringFallback);
+        if (matchScore === 0) continue;
+      }
+
+      const eligibility = isPersonEligibleForScale(person, isRedScale);
+      const busyReason = busyReasonByPerson.get(person.id);
+      const lastDutyDate = lastSameScaleDateByPerson.get(person.id) ?? null;
+      const lastAnyDutyDate = lastAnyDutyDateByPerson.get(person.id) ?? null;
+      // Exact full days off between lastDutyDate and targetDate (e.g. duty Day 10 -> target Day 14 = 3 full rest days = 3x1)
+      const daysSinceLastDuty = lastDutyDate
+        ? Math.max(0, diffIsoDays(targetDate, lastDutyDate) - 1)
+        : null;
+
+      list.push({
+        matchScore,
+        candidate: {
+          person,
+          eligibleForScale: eligibility.eligible,
+          ineligibleReason: eligibility.reason,
+          busyOnTargetDate: Boolean(busyReason),
+          busyReason,
+          daysSinceLastDuty,
+          lastDutyDate,
+          totalDutiesOnScale: sameScaleCountByPerson.get(person.id) ?? 0,
+          lastAnyDutyDate,
+        },
+      });
     }
 
-    const eligibility = isPersonEligibleForScale(person, isRedScale);
-    const busyReason = busyReasonByPerson.get(person.id);
-    const lastDutyDate = lastSameScaleDateByPerson.get(person.id) ?? null;
-    const lastAnyDutyDate = lastAnyDutyDateByPerson.get(person.id) ?? null;
-    // Exact full days off between lastDutyDate and targetDate (e.g. duty Day 10 -> target Day 14 = 3 full rest days = 3x1)
-    const daysSinceLastDuty = lastDutyDate
-      ? Math.max(0, diffIsoDays(targetDate, lastDutyDate) - 1)
-      : null;
+    return list;
+  };
 
-    candidates.push({
-      person,
-      eligibleForScale: eligibility.eligible,
-      ineligibleReason: eligibility.reason,
-      busyOnTargetDate: Boolean(busyReason),
-      busyReason,
-      daysSinceLastDuty,
-      lastDutyDate,
-      totalDutiesOnScale: sameScaleCountByPerson.get(person.id) ?? 0,
-      lastAnyDutyDate,
-    });
+  let matchedEntries = collectCandidates(false);
+  if (matchedEntries.length === 0 && parsedSearch.nameNeedle.length >= 3) {
+    matchedEntries = collectCandidates(true);
   }
 
-  // Sort strictly from Most Rested (Mais Folgado) -> Least Rested (Menos Folgado)
-  // Priority tiers:
-  //   Tier 0: Eligible & Free on targetDate
-  //   Tier 1: Eligible & Busy on targetDate
-  //   Tier 2: Ineligible for this scale (black_only / red_only / none)
-  candidates.sort((a, b) => {
+  // Sort:
+  // - When typing a query: primary warName prefix matches first -> fullName/word prefix matches;
+  //   within each prefix tier, sort by Ordem de Folga (eligible & free -> most rested -> alphabetical)
+  // - When empty query: strictly by Ordem de Folga (Most Rested -> Least Rested)
+  matchedEntries.sort((entryA, entryB) => {
+    if (rawQuery) {
+      const bucketA = entryA.matchScore >= 90 ? 0 : entryA.matchScore >= 80 ? 1 : 2;
+      const bucketB = entryB.matchScore >= 90 ? 0 : entryB.matchScore >= 80 ? 1 : 2;
+      if (bucketA !== bucketB) return bucketA - bucketB;
+    }
+
+    const a = entryA.candidate;
+    const b = entryB.candidate;
     const tierA = !a.eligibleForScale ? 2 : a.busyOnTargetDate ? 1 : 0;
     const tierB = !b.eligibleForScale ? 2 : b.busyOnTargetDate ? 1 : 0;
     if (tierA !== tierB) return tierA - tierB;
@@ -1019,10 +1180,13 @@ export function computeRestOrderCandidates(params: {
     const anyB = b.lastAnyDutyDate ?? '';
     if (anyA !== anyB) return anyA.localeCompare(anyB);
 
-    return a.person.warName.localeCompare(b.person.warName, 'pt-BR');
+    return (
+      a.person.warName.localeCompare(b.person.warName, 'pt-BR') ||
+      a.person.fullName.localeCompare(b.person.fullName, 'pt-BR')
+    );
   });
 
-  return candidates;
+  return matchedEntries.map((e) => e.candidate);
 }
 
 /** Suggests an initial rank filter chip when clicking a cell whose schedule or column clearly targets a specific rank */
@@ -1038,6 +1202,7 @@ export function inferRankFilterFromScheduleContext(
     { pattern: /\b2[º°O]?\s*(?:SGT|SARGENTO)\b/, rank: '2º Sgt' },
     { pattern: /\b1[º°O]?\s*(?:SGT|SARGENTO)\b/, rank: '1º Sgt' },
     { pattern: /\bCABO\b|\bCB\b/, rank: 'Cb' },
+    { pattern: /\bSD\s+EV\b|\bSOLDADO\s+EV\b/, rank: 'Sd EV' },
     { pattern: /\bSOLDADO\b|\bSD\b/, rank: 'Sd' },
   ];
 

@@ -3,6 +3,7 @@ import { signOut } from 'firebase/auth';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { AdminDashboard } from './components/AdminDashboard';
+import { AutoUpdateBanner } from './components/AutoUpdateBanner';
 import { DynamicMatrixView } from './components/DynamicMatrixView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Header, MobileBottomNav, type AppView } from './components/Header';
@@ -10,8 +11,15 @@ import { HomeOverview } from './components/HomeOverview';
 import { OfflineIndicator } from './components/PWAInstallButton';
 import { ScheduleViewer } from './components/ScheduleViewer';
 import { SoldierSearchView } from './components/SoldierSearchView';
+import { BATTALION_PERSONNEL } from './data/battalionPersonnel';
 import { getTodayIsoLocal, INITIAL_SCHEDULES } from './data/initialSchedules';
 import { logoutAdminToken } from './lib/adminApi';
+import {
+  consumeAutoUpdateSnapshot,
+  getRestoredSlice,
+  isAutoUpdateReloading,
+  registerSnapshotProvider,
+} from './lib/autoUpdate';
 import { auth } from './lib/firebase';
 import { TRANSITION_VIEW, VIEW_VARIANTS } from './lib/motion';
 import {
@@ -33,32 +41,79 @@ import type {
   ScheduleModel,
 } from './types/schedule';
 
+interface AppRestoredState {
+  activeView: AppView;
+  selectedScheduleId: string;
+  viewMode: 'table' | 'daily';
+  focusedDate: string;
+  searchSeedQuery: string;
+  adminToken: string | null;
+}
+
 export default function App() {
   const todayIso = useMemo(() => getTodayIsoLocal(), []);
+  const restoredApp = useMemo(() => getRestoredSlice<AppRestoredState>('app'), []);
 
-  const [activeView, setActiveView] = useState<AppView>('home');
+  const [activeView, setActiveView] = useState<AppView>(restoredApp?.activeView ?? 'home');
   const [schedules, setSchedules] = useState<ScheduleModel[]>(INITIAL_SCHEDULES);
   const [isCloudSynced, setIsCloudSynced] = useState(false);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [entriesBySchedule, setEntriesBySchedule] = useState<Record<string, ScheduleEntry[]>>({});
-  const [personnel, setPersonnel] = useState<PersonnelProfile[]>([]);
+  const [personnel, setPersonnel] = useState<PersonnelProfile[]>(BATTALION_PERSONNEL);
+  const [personnelLoaded, setPersonnelLoaded] = useState(false);
   const [missions, setMissions] = useState<MissionRecord[]>([]);
   const [calendarDays, setCalendarDays] = useState<Record<string, CalendarDayOverride>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // Viewer state
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string>(INITIAL_SCHEDULES[0].id);
-  const [viewMode, setViewMode] = useState<'table' | 'daily'>(() =>
-    typeof window !== 'undefined' && window.innerWidth < 640 ? 'daily' : 'table'
+  const [selectedScheduleId, setSelectedScheduleId] = useState<string>(
+    restoredApp?.selectedScheduleId ?? INITIAL_SCHEDULES[0].id
   );
-  const [focusedDate, setFocusedDate] = useState<string>(todayIso);
-  const [searchSeedQuery, setSearchSeedQuery] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'daily'>(
+    () =>
+      restoredApp?.viewMode ??
+      (typeof window !== 'undefined' && window.innerWidth < 640 ? 'daily' : 'table')
+  );
+  const [focusedDate, setFocusedDate] = useState<string>(restoredApp?.focusedDate ?? todayIso);
+  const [searchSeedQuery, setSearchSeedQuery] = useState<string>(
+    restoredApp?.searchSeedQuery ?? ''
+  );
 
-  // Admin session (held strictly in JS memory — NEVER persisted in localStorage/sessionStorage)
-  const [adminToken, setAdminToken] = useState<string | null>(null);
+  // Admin session (held in JS memory; handed off strictly once during an automatic app update reload)
+  const [adminToken, setAdminToken] = useState<string | null>(restoredApp?.adminToken ?? null);
   const [showAdminModal, setShowAdminModal] = useState(false);
   const adminTokenRef = useRef<string | null>(null);
   adminTokenRef.current = adminToken;
+
+  const appStateRef = useRef<AppRestoredState>({
+    activeView,
+    selectedScheduleId,
+    viewMode,
+    focusedDate,
+    searchSeedQuery,
+    adminToken,
+  });
+  appStateRef.current = {
+    activeView,
+    selectedScheduleId,
+    viewMode,
+    focusedDate,
+    searchSeedQuery,
+    adminToken,
+  };
+
+  // Register app-level state snapshot for zero-loss automatic update reloads
+  useEffect(() => registerSnapshotProvider('app', () => appStateRef.current), []);
+
+  // Restore scroll position after an automatic update reload
+  useEffect(() => {
+    const snap = consumeAutoUpdateSnapshot();
+    if (snap && snap.scrollY > 0) {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: snap.scrollY, behavior: 'instant' as ScrollBehavior });
+      });
+    }
+  }, []);
 
   // Real-time subscription to schedules list
   useEffect(() => {
@@ -98,7 +153,17 @@ export default function App() {
   const isAdminSessionActive = activeView === 'admin' && Boolean(adminToken);
 
   useEffect(() => {
-    const unsubPersonnel = subscribeToPersonnel(isAdminSessionActive, setPersonnel);
+    setPersonnelLoaded(false);
+    const unsubPersonnel = subscribeToPersonnel(
+      isAdminSessionActive,
+      (list) => {
+        setPersonnel(list);
+        setPersonnelLoaded(true);
+      },
+      () => {
+        setPersonnelLoaded(true);
+      }
+    );
     const unsubMissions = subscribeToMissions(isAdminSessionActive, setMissions);
     const unsubCalendarDays = subscribeToCalendarDays(setCalendarDays);
     return () => {
@@ -139,9 +204,12 @@ export default function App() {
     }
   }, []);
 
-  // Revoke active server session if user closes/refreshes tab
+  // Revoke active server session if user manually closes/refreshes tab (skip during automatic app update reload)
   useEffect(() => {
     const handleUnload = () => {
+      if (isAutoUpdateReloading()) {
+        return;
+      }
       const token = adminTokenRef.current;
       if (token) {
         void logoutAdminToken(token, true);
@@ -266,6 +334,7 @@ export default function App() {
                     schedules={schedules}
                     entriesBySchedule={entriesBySchedule}
                     personnel={personnel}
+                    personnelLoaded={personnelLoaded}
                     missions={missions}
                     calendarDays={calendarDays}
                     auditLogs={auditLogs}
@@ -310,6 +379,7 @@ export default function App() {
           />
 
           <OfflineIndicator />
+          <AutoUpdateBanner />
         </div>
       </ErrorBoundary>
     </MotionConfig>

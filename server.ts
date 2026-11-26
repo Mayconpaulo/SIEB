@@ -300,10 +300,26 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.resolve(__dirname, 'dist');
-    app.use(express.static(distPath));
+    app.use(
+      express.static(distPath, {
+        setHeaders(res, filePath) {
+          const base = path.basename(filePath);
+          if (
+            base === 'version.json' ||
+            base === 'sw.js' ||
+            base === 'registerSW.js' ||
+            base === 'index.html' ||
+            base === 'manifest.webmanifest'
+          ) {
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          }
+        },
+      })
+    );
     app.get('*', (_req: Request, res: Response) => {
       const indexHtml = path.join(distPath, 'index.html');
       if (fs.existsSync(indexHtml)) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.sendFile(indexHtml);
       } else {
         res.status(404).send('Build output not found.');
