@@ -19,6 +19,9 @@ import {
   formatPersonnelDisplay,
   getEffectiveScaleMode,
   getMonthDateRange,
+  matchesMatrixSheet,
+  MATRIX_RANK_SHEETS,
+  type MatrixSheetId,
 } from '../lib/matrixEngine';
 import { SPRING_MODAL, SPRING_TAB, TRANSITION_MICRO } from '../lib/motion';
 import {
@@ -131,6 +134,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
   const restoredMatrix = useMemo(
     () =>
       getRestoredSlice<{
+        activeSheet?: MatrixSheetId;
         periodMode?: 'month' | 'custom';
         selectedYear?: number;
         selectedMonth0?: number;
@@ -146,6 +150,9 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
     []
   );
 
+  const [activeSheet, setActiveSheet] = useState<MatrixSheetId>(
+    restoredMatrix?.activeSheet ?? 'tenentes'
+  );
   const [periodMode, setPeriodMode] = useState<'month' | 'custom'>(
     restoredMatrix?.periodMode ?? 'month'
   );
@@ -175,9 +182,14 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
   );
   const [visibleRows, setVisibleRows] = useState(60);
 
+  const activeSheetDef = useMemo(
+    () => MATRIX_RANK_SHEETS.find((s) => s.id === activeSheet) ?? MATRIX_RANK_SHEETS[0],
+    [activeSheet]
+  );
+
   useEffect(() => {
     setVisibleRows(60);
-  }, [searchQuery, rankFilter, companyFilter, selectedYear, selectedMonth0, periodMode]);
+  }, [activeSheet, searchQuery, rankFilter, companyFilter, selectedYear, selectedMonth0, periodMode]);
 
   // Detail modal state (individual soldier history + optional focused date)
   const [inspectedPersonId, setInspectedPersonId] = useState<{
@@ -195,6 +207,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
   const [savingScaleMode, setSavingScaleMode] = useState(false);
 
   const matrixSnapshotRef = useRef({
+    activeSheet,
     periodMode,
     selectedYear,
     selectedMonth0,
@@ -208,6 +221,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
     editingDay,
   });
   matrixSnapshotRef.current = {
+    activeSheet,
     periodMode,
     selectedYear,
     selectedMonth0,
@@ -223,12 +237,25 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
 
   useEffect(() => registerSnapshotProvider('matrix', () => matrixSnapshotRef.current), []);
 
+  const sheetCounts = useMemo(() => {
+    const activePersonnel = personnel.filter((p) => p.active);
+    const counts = {} as Record<MatrixSheetId, number>;
+    for (const sheet of MATRIX_RANK_SHEETS) {
+      counts[sheet.id] = sheet.ranks
+        ? activePersonnel.filter((p) => matchesMatrixSheet(p.rank, sheet)).length
+        : activePersonnel.length;
+    }
+    return counts;
+  }, [personnel]);
+
   const activeRange = useMemo(() => {
     if (periodMode === 'month') {
       return getMonthDateRange(selectedYear, selectedMonth0);
     }
     return { startDate: customStart, endDate: customEnd };
   }, [periodMode, selectedYear, selectedMonth0, customStart, customEnd]);
+
+  const effectiveRankFilter = activeSheet === 'all' ? rankFilter : 'all';
 
   const matrix = useMemo(
     () =>
@@ -242,7 +269,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
         endDate: activeRange.endDate,
         filters: {
           searchQuery,
-          rankFilter,
+          rankGroup: activeSheetDef.ranks,
+          rankFilter: effectiveRankFilter,
           companyFilter,
         },
       }),
@@ -255,7 +283,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       activeRange.startDate,
       activeRange.endDate,
       searchQuery,
-      rankFilter,
+      activeSheetDef.ranks,
+      effectiveRankFilter,
       companyFilter,
     ]
   );
@@ -360,7 +389,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
-            Planilha Dinâmica
+            Planilha de Folga · {activeSheetDef.title}
           </h1>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#98A89F] font-mono tabular-nums">
             <span className="text-[#E5C17B] font-semibold">
@@ -422,6 +451,49 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             <span>Sem registro</span>
           </span>
         </div>
+      </div>
+
+      {/* Dedicated Rank Sheet Selector */}
+      <div
+        role="tablist"
+        aria-label="Planilhas por graduação"
+        className="btl-tab-track flex items-center gap-1 overflow-x-auto schedule-scroll p-1"
+      >
+        {MATRIX_RANK_SHEETS.map((sheet) => {
+          const isSelected = activeSheet === sheet.id;
+          const count = sheetCounts[sheet.id] ?? 0;
+          return (
+            <button
+              key={sheet.id}
+              type="button"
+              role="tab"
+              aria-selected={isSelected}
+              onClick={() => {
+                setActiveSheet(sheet.id);
+                if (sheet.id !== 'all') setRankFilter('all');
+              }}
+              className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 text-xs sm:text-[13px] font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+                isSelected ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+              }`}
+            >
+              {isSelected && (
+                <motion.span
+                  layoutId="matrix-rank-sheet-tab"
+                  transition={SPRING_TAB}
+                  className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/24 to-[#2D5A43]/38 border border-[#C8A461]/48 shadow-[inset_0_1px_0_rgba(255,250,236,0.2)]"
+                />
+              )}
+              <span className="relative z-10">{sheet.tabLabel}</span>
+              <span
+                className={`relative z-10 font-mono text-[10px] tabular-nums ${
+                  isSelected ? 'text-[#E5C17B]' : 'text-[#697870]'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Period Navigation & Filters Bar */}
@@ -586,19 +658,21 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             )}
           </div>
 
-          <select
-            value={rankFilter}
-            onChange={(e) => setRankFilter(e.target.value)}
-            aria-label="Filtrar por graduação"
-            className="btl-select md:w-44 min-h-[40px] px-3 py-1.5"
-          >
-            <option value="all">Todas graduações</option>
-            {matrix.availableRanks.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          {activeSheet === 'all' && (
+            <select
+              value={rankFilter}
+              onChange={(e) => setRankFilter(e.target.value)}
+              aria-label="Filtrar por graduação"
+              className="btl-select md:w-44 min-h-[40px] px-3 py-1.5"
+            >
+              <option value="all">Todas graduações</option>
+              {matrix.availableRanks.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
+          )}
 
           {matrix.availableCompanies.length > 0 && (
             <select

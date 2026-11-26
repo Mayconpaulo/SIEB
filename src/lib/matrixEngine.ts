@@ -173,14 +173,99 @@ const RANK_ORDER: Record<string, number> = {
   'Sd EV': 15,
 };
 
+export function getRankOrder(rank: string): number {
+  return RANK_ORDER[rank] ?? 99;
+}
+
 /** Sorts military ranks in official hierarchy order (Cel -> Sd EV), then alphabetically */
 export function sortMilitaryRanks(ranks: string[]): string[] {
   return [...ranks].sort((a, b) => {
-    const oa = RANK_ORDER[a] ?? 99;
-    const ob = RANK_ORDER[b] ?? 99;
+    const oa = getRankOrder(a);
+    const ob = getRankOrder(b);
     if (oa !== ob) return oa - ob;
     return a.localeCompare(b, 'pt-BR');
   });
+}
+
+export type MatrixSheetId =
+  | 'tenentes'
+  | 'sargentos'
+  | '1_sgt'
+  | '2_sgt'
+  | '3_sgt'
+  | 'cb'
+  | 'sd'
+  | 'sd_ev'
+  | 'all';
+
+export interface MatrixRankSheetDef {
+  id: MatrixSheetId;
+  tabLabel: string;
+  title: string;
+  ranks: readonly string[] | null;
+}
+
+export const MATRIX_RANK_SHEETS: readonly MatrixRankSheetDef[] = [
+  {
+    id: 'tenentes',
+    tabLabel: 'Tenentes',
+    title: 'Tenentes',
+    ranks: ['1º Ten', '2º Ten'],
+  },
+  {
+    id: 'sargentos',
+    tabLabel: 'Sargentos',
+    title: 'Sargentos',
+    ranks: ['1º Sgt', '2º Sgt', '3º Sgt'],
+  },
+  {
+    id: '1_sgt',
+    tabLabel: '1º Sgt',
+    title: '1º Sargento',
+    ranks: ['1º Sgt'],
+  },
+  {
+    id: '2_sgt',
+    tabLabel: '2º Sgt',
+    title: '2º Sargento',
+    ranks: ['2º Sgt'],
+  },
+  {
+    id: '3_sgt',
+    tabLabel: '3º Sgt',
+    title: '3º Sargento',
+    ranks: ['3º Sgt'],
+  },
+  {
+    id: 'cb',
+    tabLabel: 'Cabo',
+    title: 'Cabos',
+    ranks: ['Cb'],
+  },
+  {
+    id: 'sd',
+    tabLabel: 'Soldado',
+    title: 'Soldados',
+    ranks: ['Sd', 'Sd EP'],
+  },
+  {
+    id: 'sd_ev',
+    tabLabel: 'EV',
+    title: 'Soldados EV',
+    ranks: ['Sd EV'],
+  },
+  {
+    id: 'all',
+    tabLabel: 'Geral',
+    title: 'Geral',
+    ranks: null,
+  },
+];
+
+export function matchesMatrixSheet(rank: string, sheet: MatrixRankSheetDef): boolean {
+  if (!sheet.ranks) return true;
+  const normalized = normalizeRankLabel(rank);
+  return sheet.ranks.includes(rank) || (Boolean(normalized) && sheet.ranks.includes(normalized));
 }
 
 /**
@@ -681,6 +766,7 @@ export function resolveDayScaleInfo(
 export interface MatrixFilterOptions {
   searchQuery?: string;
   rankFilter?: string;
+  rankGroup?: readonly string[] | null;
   companyFilter?: string;
   includeInactive?: boolean;
 }
@@ -850,8 +936,11 @@ export function buildDynamicMatrix(params: {
   ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
   // 2. Filter personnel rows (keep inactive personnel ONLY if includeInactive OR they have historical records in this period)
-  const queryNorm = normalizeMilitaryText(filters?.searchQuery ?? '');
+  const rawSearch = filters?.searchQuery ?? '';
+  const queryNorm = normalizeMilitaryText(rawSearch);
+  const parsedSearch = queryNorm ? parseProgressiveSearchQuery(rawSearch) : null;
   const rankFilter = filters?.rankFilter ?? 'all';
+  const rankGroup = filters?.rankGroup ?? null;
   const companyFilter = filters?.companyFilter ?? 'all';
   const includeInactive = filters?.includeInactive ?? false;
 
@@ -860,23 +949,39 @@ export function buildDynamicMatrix(params: {
     if (!person.active && !includeInactive && !hasHistoryInPeriod) {
       return false;
     }
+    if (rankGroup && rankGroup.length > 0) {
+      const normRank = normalizeRankLabel(person.rank);
+      if (!rankGroup.includes(person.rank) && !(normRank && rankGroup.includes(normRank))) {
+        return false;
+      }
+    }
     if (rankFilter !== 'all' && person.rank !== rankFilter) {
       return false;
     }
     if (companyFilter !== 'all' && person.company !== companyFilter) {
       return false;
     }
-    if (queryNorm) {
-      const hay = normalizeMilitaryText(
-        `${person.rank} ${person.warName} ${person.fullName} ${person.company}`
-      );
-      if (!hay.includes(queryNorm)) return false;
+    if (queryNorm && parsedSearch) {
+      const progressive = scoreProgressivePersonnelMatch(person, parsedSearch);
+      if (progressive === null) {
+        if (
+          queryNorm.length < 2 ||
+          !normalizeMilitaryText(person.company).includes(queryNorm)
+        ) {
+          return false;
+        }
+      }
     }
     return true;
   });
 
-  // Sort alphabetically by warName (stable, predictable roster ordering)
-  filteredPersonnel.sort((a, b) => a.warName.localeCompare(b.warName, 'pt-BR'));
+  // Sort by military rank hierarchy first, then alphabetically by warName and fullName
+  filteredPersonnel.sort(
+    (a, b) =>
+      getRankOrder(a.rank) - getRankOrder(b.rank) ||
+      a.warName.localeCompare(b.warName, 'pt-BR') ||
+      a.fullName.localeCompare(b.fullName, 'pt-BR')
+  );
 
   // 3. Build row cells + automatic sequential folga counters (1, 2, 3...) + individual calculations
   const rows: MatrixPersonnelRow[] = filteredPersonnel.map((person) => {
