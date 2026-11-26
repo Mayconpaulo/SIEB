@@ -369,14 +369,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                           scope="col"
                           className="px-4 py-3.5 text-xs sm:text-[13px] font-semibold border-r last:border-r-0 border-[#EBE0C8]/10 whitespace-nowrap min-w-[165px]"
                         >
-                          <div className="flex flex-col">
-                            <span>{col.label}</span>
-                            {col.kind === 'reference' && (
-                              <span className="text-[10px] font-normal text-[#C8A461]/80 mt-0.5">
-                                Referência / Externo
-                              </span>
-                            )}
-                          </div>
+                          {col.label}
                         </th>
                       ))}
                     </tr>
@@ -458,14 +451,6 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                     })}
                   </tbody>
                 </table>
-              </div>
-              <div className="px-4 py-3 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
-                <span>
-                  Legenda: datas em vermelho indicam finais de semana ou feriados (escala vermelha). Nomes entre parênteses indicam troca ou substituição.
-                </span>
-                <span className="font-mono tabular-nums text-[#E5C17B]">
-                  {filteredEntries.length} linha(s)
-                </span>
               </div>
             </motion.div>
           ) : (
@@ -619,15 +604,8 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                               key={col.id}
                               className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-6 hover:bg-[#E4EAE6]/[0.025] transition-colors"
                             >
-                              <div className="space-y-0.5">
-                                <div className="text-xs font-semibold text-[#C8D4CD]">
-                                  {col.label}
-                                </div>
-                                {col.kind === 'reference' && (
-                                  <div className="text-[11px] text-[#C8A461]/80">
-                                    Referência / Serviço externo
-                                  </div>
-                                )}
+                              <div className="text-xs font-semibold text-[#C8D4CD]">
+                                {col.label}
                               </div>
                               <div className="text-base sm:text-right">
                                 {value ? (

@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ArrowDown,
   ArrowUp,
+  Briefcase,
   CalendarPlus,
   Check,
   CloudUpload,
@@ -14,7 +15,9 @@ import {
   Plus,
   Save,
   Table2,
+  TableProperties,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -26,12 +29,23 @@ import {
   slugifyId,
 } from '../data/initialSchedules';
 import {
+  formatPersonnelDisplay,
+  inferRankFilterFromScheduleContext,
+  parseMilitaryInput,
+} from '../lib/matrixEngine';
+import {
   SPRING_MODAL,
   SPRING_TAB,
   TRANSITION_MICRO,
   TRANSITION_VIEW,
   VIEW_VARIANTS,
 } from '../lib/motion';
+import {
+  autoRegisterPersonnelFromScheduleCells,
+  createPersonnelProfile,
+  saveCalendarDayOverride,
+  updatePersonnelScaleMode,
+} from '../lib/personnelService';
 import {
   createScheduleModel,
   deleteScheduleModel,
@@ -44,25 +58,40 @@ import {
 } from '../lib/scheduleService';
 import {
   BLUEPRINT_LIMITS,
+  SCALE_MODE_LABELS,
   type AuditLogEntry,
+  type CalendarDayOverride,
   type ColumnKind,
+  type LeaveRecord,
+  type MissionRecord,
+  type PersonnelProfile,
+  type PersonnelScaleMode,
   type ScheduleColumn,
   type ScheduleEntry,
   type ScheduleModel,
 } from '../types/schedule';
+import { AdminMissionsLeavesTab } from './AdminMissionsLeavesTab';
+import { AdminPersonnelTab } from './AdminPersonnelTab';
 import { AuditHistoryView } from './AuditHistoryView';
+import { DynamicMatrixView } from './DynamicMatrixView';
+import { PersonnelAutocompleteInput } from './PersonnelAutocompleteInput';
 
 interface AdminDashboardProps {
   adminToken: string;
   isCloudSynced: boolean;
   schedules: ScheduleModel[];
   entriesBySchedule: Record<string, ScheduleEntry[]>;
+  personnel: PersonnelProfile[];
+  missions: MissionRecord[];
+  leaves: LeaveRecord[];
+  calendarDays: Record<string, CalendarDayOverride>;
   auditLogs: AuditLogEntry[];
+  todayIso: string;
   onSessionExpired: () => void;
   onExitAdmin: () => void;
 }
 
-type AdminTab = 'entries' | 'models' | 'history';
+type AdminTab = 'entries' | 'missions' | 'personnel' | 'matrix' | 'models' | 'history';
 
 interface DiffItem {
   date: string;
@@ -73,7 +102,10 @@ interface DiffItem {
 
 const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'entries', label: 'Editar Escalas', icon: Table2 },
-  { id: 'models', label: 'Modelos e Colunas', icon: Layers },
+  { id: 'missions', label: 'Missões e Folgas', icon: Briefcase },
+  { id: 'personnel', label: 'Efetivo', icon: Users },
+  { id: 'matrix', label: 'Planilha', icon: TableProperties },
+  { id: 'models', label: 'Modelos', icon: Layers },
   { id: 'history', label: 'Histórico', icon: History },
 ];
 
@@ -82,7 +114,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isCloudSynced,
   schedules,
   entriesBySchedule,
+  personnel,
+  missions,
+  leaves,
+  calendarDays,
   auditLogs,
+  todayIso,
   onSessionExpired,
   onExitAdmin,
 }) => {
@@ -289,6 +326,95 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
   };
 
+  // Live entries snapshot merging unsaved drafts in the active schedule so Ordem de Folga reacts immediately
+  const liveEntriesBySchedule = useMemo(
+    () =>
+      selectedSchedule
+        ? { ...entriesBySchedule, [selectedSchedule.id]: draftEntries }
+        : entriesBySchedule,
+    [entriesBySchedule, selectedSchedule, draftEntries]
+  );
+
+  const availablePersonnelRanks = useMemo(
+    () => Array.from(new Set(personnel.filter((p) => p.active).map((p) => p.rank).filter(Boolean))),
+    [personnel]
+  );
+
+  const handleSaveMatrixDayScale = async (
+    date: string,
+    isRedScale: boolean,
+    holidayLabel: string
+  ) => {
+    setFeedback(null);
+    setBusyMessage('Atualizando escala do dia na planilha...');
+    try {
+      const syncedCount = await saveCalendarDayOverride(
+        adminToken,
+        date,
+        isRedScale,
+        holidayLabel,
+        schedules,
+        entriesBySchedule
+      );
+      setFeedback({
+        type: 'success',
+        text: `${formatShortDatePt(date)} definido como ${
+          isRedScale ? 'Escala Vermelha (V)' : 'Escala Preta (P)'
+        }${syncedCount > 0 ? ` (${syncedCount} escala(s) sincronizada(s))` : ''}.`,
+      });
+    } catch (err) {
+      handleActionError(err);
+    } finally {
+      setBusyMessage('');
+    }
+  };
+
+  const handleSaveMatrixPersonScaleMode = async (
+    person: PersonnelProfile,
+    scaleMode: PersonnelScaleMode
+  ) => {
+    setFeedback(null);
+    setBusyMessage('Atualizando concorrência de escala...');
+    try {
+      await updatePersonnelScaleMode(adminToken, person, scaleMode);
+      setFeedback({
+        type: 'success',
+        text: `${formatPersonnelDisplay(person)} atualizado para: ${SCALE_MODE_LABELS[scaleMode]}.`,
+      });
+    } catch (err) {
+      handleActionError(err);
+    } finally {
+      setBusyMessage('');
+    }
+  };
+
+  const handleQuickCreateFromCell = async (rawInput: string): Promise<PersonnelProfile | null> => {
+    const parsed = parseMilitaryInput(rawInput);
+    if (!parsed) return null;
+    try {
+      const { profile, created } = await createPersonnelProfile(
+        adminToken,
+        {
+          fullName: parsed.fullName,
+          warName: parsed.warName,
+          rank: parsed.rank,
+          company: '',
+        },
+        personnel
+      );
+      if (created) {
+        setFeedback({
+          type: 'success',
+          text: `Militar "${formatPersonnelDisplay(profile)}" cadastrado automaticamente na base do efetivo.`,
+        });
+      }
+      return profile;
+    } catch (err) {
+      handleActionError(err);
+      return null;
+    }
+  };
+
   const handleCommitDraftChanges = async () => {
     if (!selectedSchedule || modifiedDatesSet.size === 0) return;
     if (!isCloudSynced) {
@@ -301,9 +427,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
 
     setFeedback(null);
-    setBusyMessage('Salvando alterações no banco online...');
+    setBusyMessage('Salvando alterações e sincronizando efetivo...');
     try {
       const changedEntries = draftEntries.filter((e) => modifiedDatesSet.has(e.date));
+      const allCellValues: string[] = [];
+      for (const entry of changedEntries) {
+        for (const col of selectedSchedule.columns) {
+          const val = (entry.assignments[col.id] ?? '').trim();
+          if (val) allCellValues.push(val);
+        }
+      }
+
+      const newlyRegistered = await autoRegisterPersonnelFromScheduleCells(
+        adminToken,
+        allCellValues,
+        personnel
+      );
+
       const summary = `${pendingDiffs.length} alteração(ões) em ${changedEntries.length} data(s)`;
       const details = pendingDiffs
         .slice(0, 8)
@@ -322,7 +462,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setShowPreviewModal(false);
       setFeedback({
         type: 'success',
-        text: 'Alterações salvas e disponibilizadas imediatamente para todos os usuários.',
+        text:
+          newlyRegistered.length > 0
+            ? `Alterações publicadas e ${newlyRegistered.length} novo(s) militar(es) cadastrado(s) automaticamente na base do efetivo.`
+            : 'Alterações salvas e refletidas automaticamente na planilha dinâmica.',
       });
     } catch (err) {
       handleActionError(err);
@@ -574,15 +717,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Admin Header Strip */}
       <div className="btl-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-            <span className="text-[#A8D8BE] font-semibold">Sessão Administrativa Ativa</span>
-            <span aria-hidden="true" className="text-[#697870]">·</span>
-            <span className="text-[#98A89F]">
-              Validada no servidor (senha exigida novamente ao sair)
-            </span>
+          <div className="text-xs text-[#A8D8BE] font-semibold">
+            Sessão Administrativa Ativa
           </div>
           <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F4E6C4]">
-            Painel Administrativo de Escalas
+            Painel Administrativo
           </h1>
         </div>
 
@@ -848,16 +987,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                           {selectedSchedule.columns.map((col) => (
                             <td key={col.id} className="px-2 py-1.5 border-r border-[#EBE0C8]/8">
-                              <input
-                                type="text"
+                              <PersonnelAutocompleteInput
+                                compact
                                 value={entry.assignments[col.id] ?? ''}
                                 maxLength={BLUEPRINT_LIMITS.MAX_ASSIGNMENT_LEN}
-                                onChange={(e) =>
-                                  updateDraftCell(entry.date, col.id, e.target.value)
+                                personnel={personnel}
+                                restOrderContext={{
+                                  targetDate: entry.date,
+                                  isRedScale: entry.isRedScale,
+                                  entriesBySchedule: liveEntriesBySchedule,
+                                  missions,
+                                  leaves,
+                                  calendarDays,
+                                  defaultRankFilter: inferRankFilterFromScheduleContext(
+                                    `${selectedSchedule.name} ${col.label}`,
+                                    availablePersonnelRanks
+                                  ),
+                                }}
+                                onChange={(nextVal) =>
+                                  updateDraftCell(entry.date, col.id, nextVal)
                                 }
+                                onSelectPerson={(person) =>
+                                  updateDraftCell(
+                                    entry.date,
+                                    col.id,
+                                    formatPersonnelDisplay(person)
+                                  )
+                                }
+                                onQuickCreate={handleQuickCreateFromCell}
                                 placeholder="—"
-                                aria-label={`${col.label} em ${entry.date}`}
-                                className="w-full min-h-[36px] px-2.5 py-1 text-xs sm:text-[13px] font-medium text-[#E4EAE6] placeholder:text-[#4F6056] bg-[#090F0C]/60 border border-transparent hover:border-[#EBE0C8]/22 focus:bg-[#080B09] focus:border-[#C8A461] focus:outline-none rounded-md transition-colors"
+                                ariaLabel={`${col.label} em ${entry.date}`}
                               />
                             </td>
                           ))}
@@ -900,7 +1059,76 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </motion.div>
         )}
 
-        {/* TAB 2: MODULAR SCHEDULE MODELS & COLUMNS MANAGER */}
+        {/* TAB 2: MISSIONS & OFFICIAL LEAVES */}
+        {activeTab === 'missions' && (
+          <motion.div
+            key="tab-missions"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+          >
+            <AdminMissionsLeavesTab
+              adminToken={adminToken}
+              personnel={personnel}
+              missions={missions}
+              leaves={leaves}
+              busyMessage={busyMessage}
+              setBusyMessage={setBusyMessage}
+              setFeedback={setFeedback}
+              onActionError={handleActionError}
+            />
+          </motion.div>
+        )}
+
+        {/* TAB 3: PERSONNEL DATABASE & BULK IMPORT */}
+        {activeTab === 'personnel' && (
+          <motion.div
+            key="tab-personnel"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+          >
+            <AdminPersonnelTab
+              adminToken={adminToken}
+              personnel={personnel}
+              busyMessage={busyMessage}
+              setBusyMessage={setBusyMessage}
+              setFeedback={setFeedback}
+              onActionError={handleActionError}
+            />
+          </motion.div>
+        )}
+
+        {/* TAB 4: DYNAMIC AUTOMATIC SPREADSHEET */}
+        {activeTab === 'matrix' && (
+          <motion.div
+            key="tab-matrix"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+          >
+            <DynamicMatrixView
+              personnel={personnel}
+              schedules={schedules}
+              entriesBySchedule={entriesBySchedule}
+              missions={missions}
+              leaves={leaves}
+              calendarDays={calendarDays}
+              todayIso={todayIso}
+              isAdmin
+              onSaveDayScale={handleSaveMatrixDayScale}
+              onSavePersonScaleMode={handleSaveMatrixPersonScaleMode}
+            />
+          </motion.div>
+        )}
+
+        {/* TAB 5: MODULAR SCHEDULE MODELS & COLUMNS MANAGER */}
         {activeTab === 'models' && (
           <motion.div
             key="tab-models"
@@ -912,14 +1140,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className="space-y-4"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="font-display text-lg font-semibold text-[#F4E6C4]">
-                  Modelos de Escala Cadastrados ({schedules.length})
-                </h2>
-                <p className="text-xs text-[#98A89F]">
-                  Adicione novas escalas ou personalize colunas e funções sem alterar os modelos existentes.
-                </p>
-              </div>
+              <h2 className="font-display text-lg font-semibold text-[#F4E6C4]">
+                Modelos de Escala ({schedules.length})
+              </h2>
               <div className="flex flex-wrap items-center gap-2">
                 {isCloudSynced && missingBaseSchedulesCount > 0 && (
                   <button
@@ -963,11 +1186,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
                         {model.name}
                       </h3>
-                      {model.description && (
-                        <p className="text-xs text-[#98A89F] leading-relaxed">
-                          {model.description}
-                        </p>
-                      )}
                       <div className="pt-2.5 border-t border-[#EBE0C8]/10 text-xs text-[#C8D4CD] leading-relaxed">
                         {model.columns.map((c) => c.label).join(' · ')}
                       </div>

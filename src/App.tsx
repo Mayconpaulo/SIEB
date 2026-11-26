@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { AdminAuthModal } from './components/AdminAuthModal';
 import { AdminDashboard } from './components/AdminDashboard';
-import { AuditHistoryView } from './components/AuditHistoryView';
+import { DynamicMatrixView } from './components/DynamicMatrixView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Header, MobileBottomNav, type AppView } from './components/Header';
 import { HomeOverview } from './components/HomeOverview';
@@ -15,11 +15,25 @@ import { logoutAdminToken } from './lib/adminApi';
 import { auth } from './lib/firebase';
 import { TRANSITION_VIEW, VIEW_VARIANTS } from './lib/motion';
 import {
+  subscribeToCalendarDays,
+  subscribeToLeaves,
+  subscribeToMissions,
+  subscribeToPersonnel,
+} from './lib/personnelService';
+import {
   subscribeToAuditLogs,
   subscribeToScheduleEntries,
   subscribeToSchedules,
 } from './lib/scheduleService';
-import type { AuditLogEntry, ScheduleEntry, ScheduleModel } from './types/schedule';
+import type {
+  AuditLogEntry,
+  CalendarDayOverride,
+  LeaveRecord,
+  MissionRecord,
+  PersonnelProfile,
+  ScheduleEntry,
+  ScheduleModel,
+} from './types/schedule';
 
 export default function App() {
   const todayIso = useMemo(() => getTodayIsoLocal(), []);
@@ -29,6 +43,10 @@ export default function App() {
   const [isCloudSynced, setIsCloudSynced] = useState(false);
   const [loadingSchedules, setLoadingSchedules] = useState(true);
   const [entriesBySchedule, setEntriesBySchedule] = useState<Record<string, ScheduleEntry[]>>({});
+  const [personnel, setPersonnel] = useState<PersonnelProfile[]>([]);
+  const [missions, setMissions] = useState<MissionRecord[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
+  const [calendarDays, setCalendarDays] = useState<Record<string, CalendarDayOverride>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // Viewer state
@@ -79,13 +97,36 @@ export default function App() {
     };
   }, [schedules, isCloudSynced]);
 
-  // Real-time subscription to audit logs
+  // Real-time subscriptions to centralized personnel, missions, and official leaves
+  const isAdminSessionActive = activeView === 'admin' && Boolean(adminToken);
+
   useEffect(() => {
+    const unsubPersonnel = subscribeToPersonnel(isAdminSessionActive, setPersonnel);
+    const unsubMissions = subscribeToMissions(isAdminSessionActive, setMissions);
+    const unsubLeaves = subscribeToLeaves(isAdminSessionActive, setLeaves);
+    const unsubCalendarDays = subscribeToCalendarDays(setCalendarDays);
+    return () => {
+      unsubPersonnel();
+      unsubMissions();
+      unsubLeaves();
+      unsubCalendarDays();
+    };
+  }, [isAdminSessionActive]);
+
+  // Real-time subscription to audit logs — strictly restricted to authenticated Admin sessions
+  useEffect(() => {
+    if (!isAdminSessionActive) {
+      setAuditLogs([]);
+      return;
+    }
     const unsub = subscribeToAuditLogs((logs) => {
       setAuditLogs(logs);
     });
-    return () => unsub();
-  }, []);
+    return () => {
+      unsub();
+      setAuditLogs([]);
+    };
+  }, [isAdminSessionActive]);
 
   // Revoke server session immediately when exiting Admin Area (forces password on every re-entry)
   const terminateAdminSession = useCallback(async () => {
@@ -196,6 +237,18 @@ export default function App() {
                   />
                 )}
 
+                {activeView === 'matrix' && (
+                  <DynamicMatrixView
+                    personnel={personnel}
+                    schedules={schedules}
+                    entriesBySchedule={entriesBySchedule}
+                    missions={missions}
+                    leaves={leaves}
+                    calendarDays={calendarDays}
+                    todayIso={todayIso}
+                  />
+                )}
+
                 {activeView === 'search' && (
                   <SoldierSearchView
                     schedules={schedules}
@@ -212,15 +265,18 @@ export default function App() {
                   />
                 )}
 
-                {activeView === 'history' && <AuditHistoryView logs={auditLogs} />}
-
                 {activeView === 'admin' && adminToken && (
                   <AdminDashboard
                     adminToken={adminToken}
                     isCloudSynced={isCloudSynced}
                     schedules={schedules}
                     entriesBySchedule={entriesBySchedule}
+                    personnel={personnel}
+                    missions={missions}
+                    leaves={leaves}
+                    calendarDays={calendarDays}
                     auditLogs={auditLogs}
+                    todayIso={todayIso}
                     onSessionExpired={() => {
                       void terminateAdminSession();
                       setActiveView('home');
@@ -238,8 +294,9 @@ export default function App() {
 
           <footer className="hidden md:block border-t border-[#EBE0C8]/10 bg-[#080B09]/65 backdrop-blur-md">
             <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-[#7D8F85]">
-              <span className="text-[#98A89F]">Escalas de Serviço do Batalhão</span>
-              <span>Consulta pública somente leitura · Edição restrita à administração</span>
+              <span className="text-[#98A89F]">
+                <strong className="text-[#F4E6C4] font-semibold">SIEB</strong> · Sistema Integrado de Escalas do Batalhão
+              </span>
             </div>
           </footer>
 

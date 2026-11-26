@@ -16,6 +16,16 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   create_period: 'Novo período',
   delete_entry: 'Data removida',
   seed_initial: 'Carga inicial',
+  create_personnel: 'Militar cadastrado',
+  update_personnel: 'Militar atualizado',
+  deactivate_personnel: 'Status de militar',
+  import_personnel: 'Importação de efetivo',
+  create_mission: 'Nova missão',
+  update_mission: 'Missão alterada',
+  delete_mission: 'Missão removida',
+  create_leave: 'Folga registrada',
+  delete_leave: 'Folga removida',
+  update_calendar_day: 'Dia alterado',
 };
 
 function formatDateTimePt(iso: string): string {
@@ -33,14 +43,9 @@ function formatDateTimePt(iso: string): string {
 export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({ logs }) => {
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
-          Histórico de Alterações
-        </h1>
-        <p className="text-sm text-[#98A89F]">
-          Registro cronológico das modificações realizadas pela administração nas escalas de serviço.
-        </p>
-      </div>
+      <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
+        Histórico de Alterações
+      </h1>
 
       {logs.length === 0 ? (
         <div className="btl-card p-10 text-center space-y-2.5">

@@ -15,9 +15,9 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
         manifest: {
           id: '/',
-          name: 'Escalas do Batalhão',
-          short_name: 'Escalas Btl',
-          description: 'Consulta online em tempo real e gerenciamento modular das escalas de serviço do batalhão.',
+          name: 'SIEB — Sistema Integrado de Escalas do Batalhão',
+          short_name: 'SIEB',
+          description: 'Sistema Integrado de Escalas do Batalhão — consulta online em tempo real e gerenciamento modular das escalas de serviço.',
           theme_color: '#080B09',
           background_color: '#080B09',
           display: 'standalone',

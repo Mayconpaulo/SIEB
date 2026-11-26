@@ -36,6 +36,7 @@ service cloud.firestore {
     function isAdmin() {
       return isVerifiedUser() && (
         request.auth.token.email == 'mayconpaulo6000@gmail.com' ||
+        request.auth.token.email == 'bda1bimec@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -80,6 +81,81 @@ service cloud.firestore {
       data.updatedAt is timestamp;
     }
 
+    function isValidPersonnel(data, personId) {
+      return data.keys().hasAll([
+        'id', 'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'scaleMode', 'createdAt', 'updatedAt'
+      ]) &&
+      data.id == personId &&
+      isValidId(data.id) &&
+      data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120 &&
+      data.warName is string && data.warName.size() >= 2 && data.warName.size() <= 80 &&
+      data.rank is string && data.rank.size() <= 40 &&
+      data.company is string && data.company.size() <= 60 &&
+      data.normalizedKey is string && data.normalizedKey.size() >= 2 && data.normalizedKey.size() <= 140 &&
+      data.active is bool &&
+      (!('scaleMode' in data) || data.scaleMode in ['both', 'black_only', 'red_only', 'none']) &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidCalendarDay(data, dateId) {
+      return data.keys().hasAll([
+        'date', 'isRedScale', 'holidayLabel', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'date', 'isRedScale', 'holidayLabel', 'updatedAt'
+      ]) &&
+      data.date == dateId &&
+      isValidDateId(data.date) &&
+      data.isRedScale is bool &&
+      data.holidayLabel is string && data.holidayLabel.size() <= 60 &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidMission(data, missionId) {
+      return data.keys().hasAll([
+        'id', 'title', 'location', 'startDate', 'endDate', 'personnelIds', 'notes', 'status', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'title', 'location', 'startDate', 'endDate', 'personnelIds', 'notes', 'status', 'createdAt', 'updatedAt'
+      ]) &&
+      data.id == missionId &&
+      isValidId(data.id) &&
+      data.title is string && data.title.size() >= 2 && data.title.size() <= 120 &&
+      data.location is string && data.location.size() <= 120 &&
+      isValidDateId(data.startDate) &&
+      isValidDateId(data.endDate) &&
+      data.endDate >= data.startDate &&
+      data.personnelIds is list && data.personnelIds.size() <= 100 &&
+      (data.personnelIds.size() == 0 || data.personnelIds[0] is string) &&
+      data.notes is string && data.notes.size() <= 300 &&
+      data.status in ['active', 'cancelled'] &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
+    function isValidLeave(data, leaveId) {
+      return data.keys().hasAll([
+        'id', 'personId', 'startDate', 'endDate', 'reason', 'status', 'createdAt', 'updatedAt'
+      ]) &&
+      data.keys().hasOnly([
+        'id', 'personId', 'startDate', 'endDate', 'reason', 'status', 'createdAt', 'updatedAt'
+      ]) &&
+      data.id == leaveId &&
+      isValidId(data.id) &&
+      isValidId(data.personId) &&
+      isValidDateId(data.startDate) &&
+      isValidDateId(data.endDate) &&
+      data.endDate >= data.startDate &&
+      data.reason is string && data.reason.size() <= 120 &&
+      data.status in ['active', 'cancelled'] &&
+      data.createdAt is timestamp &&
+      data.updatedAt is timestamp;
+    }
+
     function isValidAuditLog(data) {
       return data.keys().hasAll([
         'action', 'scheduleId', 'scheduleName', 'summary', 'details', 'actorLabel', 'createdAt'
@@ -89,7 +165,10 @@ service cloud.firestore {
       ]) &&
       data.action in [
         'create_schedule', 'update_schedule', 'delete_schedule',
-        'update_entries', 'create_period', 'delete_entry', 'seed_initial'
+        'update_entries', 'create_period', 'delete_entry', 'seed_initial',
+        'create_personnel', 'update_personnel', 'deactivate_personnel', 'import_personnel',
+        'create_mission', 'update_mission', 'delete_mission',
+        'create_leave', 'delete_leave', 'update_calendar_day'
       ] &&
       isValidId(data.scheduleId) &&
       data.scheduleName is string && data.scheduleName.size() >= 1 && data.scheduleName.size() <= 120 &&
@@ -173,9 +252,102 @@ service cloud.firestore {
       }
     }
 
+    match /personnel/{personId} {
+      allow get: if isValidId(personId) && (resource == null || existing().active == true || isAdmin());
+      allow list: if existing().active == true || isAdmin();
+
+      allow create: if isAdmin() &&
+        isValidId(personId) &&
+        isValidPersonnel(incoming(), personId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidId(personId) &&
+        isValidPersonnel(incoming(), personId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'scaleMode', 'updatedAt'
+        ]);
+
+      // Soft-deactivation only so historical duties and missions are never orphaned
+      allow delete: if false;
+    }
+
+    match /calendar_days/{dateId} {
+      allow get: if isValidDateId(dateId);
+      allow list: if isValidDateId(existing().date);
+
+      allow create: if isAdmin() &&
+        isValidDateId(dateId) &&
+        isValidCalendarDay(incoming(), dateId) &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidDateId(dateId) &&
+        isValidCalendarDay(incoming(), dateId) &&
+        incoming().date == existing().date &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'isRedScale', 'holidayLabel', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidDateId(dateId);
+    }
+
+    match /missions/{missionId} {
+      allow get: if isValidId(missionId) && (resource == null || existing().status == 'active' || isAdmin());
+      allow list: if existing().status == 'active' || isAdmin();
+
+      allow create: if isAdmin() &&
+        isValidId(missionId) &&
+        isValidMission(incoming(), missionId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidId(missionId) &&
+        isValidMission(incoming(), missionId) &&
+        incoming().id == existing().id &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'location', 'startDate', 'endDate', 'personnelIds', 'notes', 'status', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(missionId);
+    }
+
+    match /leaves/{leaveId} {
+      allow get: if isValidId(leaveId) && (resource == null || existing().status == 'active' || isAdmin());
+      allow list: if existing().status == 'active' || isAdmin();
+
+      allow create: if isAdmin() &&
+        isValidId(leaveId) &&
+        isValidLeave(incoming(), leaveId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/personnel/$(incoming().personId));
+
+      allow update: if isAdmin() &&
+        isValidId(leaveId) &&
+        isValidLeave(incoming(), leaveId) &&
+        incoming().id == existing().id &&
+        incoming().personId == existing().personId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'startDate', 'endDate', 'reason', 'status', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(leaveId);
+    }
+
     match /audit_logs/{logId} {
-      allow get: if isValidId(logId);
-      allow list: if existing().actorLabel == 'Administrador' || isAdmin();
+      allow get: if isAdmin() && isValidId(logId);
+      allow list: if isAdmin() && existing().actorLabel == 'Administrador';
 
       allow create: if isAdmin() &&
         isValidId(logId) &&

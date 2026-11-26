@@ -62,12 +62,14 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
               {schedules.length} {schedules.length === 1 ? 'escala ativa' : 'escalas ativas'}
             </span>
           </div>
-          <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#F4E6C4] [text-wrap:balance]">
-            Escalas de Serviço do Batalhão
-          </h1>
-          <p className="text-sm sm:text-base text-[#98A89F] leading-relaxed">
-            Consulte os militares escalados para hoje, pesquise por nome de guerra ou navegue pelas planilhas completas em tempo real.
-          </p>
+          <div className="space-y-1">
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-[0.04em] text-[#F4E6C4]">
+              SIEB
+            </h1>
+            <p className="font-display text-sm sm:text-base font-medium text-[#E5C17B] tracking-tight">
+              Sistema Integrado de Escalas do Batalhão
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
@@ -264,19 +266,11 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
                     <span>{periodLabel}</span>
                   </div>
 
-                  <div>
-                    <h3 className="font-display text-lg font-semibold text-[#F4E6C4]">
-                      {schedule.name}
-                    </h3>
-                    {schedule.description && (
-                      <p className="text-sm text-[#98A89F] mt-1 leading-relaxed">
-                        {schedule.description}
-                      </p>
-                    )}
-                  </div>
+                  <h3 className="font-display text-lg font-semibold text-[#F4E6C4]">
+                    {schedule.name}
+                  </h3>
 
                   <div className="pt-3 border-t border-[#EBE0C8]/10">
-                    <p className="text-xs text-[#7D8F85] mb-1">Funções contempladas:</p>
                     <p className="text-xs font-medium text-[#C8D4CD] leading-relaxed">
                       {schedule.columns.map((c) => c.label).join(' · ')}
                     </p>

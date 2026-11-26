@@ -100,14 +100,9 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
-          Pesquisa por Militar
-        </h1>
-        <p className="text-sm text-[#98A89F]">
-          Localize todos os serviços e substituições de um militar em qualquer escala cadastrada.
-        </p>
-      </div>
+      <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
+        Pesquisa por Militar
+      </h1>
 
       <div className="btl-panel p-5 space-y-4">
         <div className="flex flex-col md:flex-row gap-3">

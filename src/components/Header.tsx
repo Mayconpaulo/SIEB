@@ -1,9 +1,9 @@
 import React from 'react';
-import { CalendarDays, History, Home, Lock, LogOut, Search } from 'lucide-react';
+import { CalendarDays, Home, Lock, LogOut, Search, TableProperties } from 'lucide-react';
 import { motion } from 'motion/react';
 import { SPRING_TAB } from '../lib/motion';
 
-export type AppView = 'home' | 'schedules' | 'search' | 'history' | 'admin';
+export type AppView = 'home' | 'schedules' | 'matrix' | 'search' | 'admin';
 
 interface HeaderProps {
   activeView: AppView;
@@ -15,8 +15,8 @@ interface HeaderProps {
 const NAV_ITEMS: { id: Exclude<AppView, 'admin'>; label: string }[] = [
   { id: 'home', label: 'Início' },
   { id: 'schedules', label: 'Escalas' },
+  { id: 'matrix', label: 'Planilha' },
   { id: 'search', label: 'Buscar Militar' },
-  { id: 'history', label: 'Histórico' },
 ];
 
 export const Header: React.FC<HeaderProps> = ({
@@ -27,14 +27,19 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-30 btl-liquid-bar border-b border-[#EBE0C8]/12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-15 md:h-16 flex items-center justify-between gap-8">
-        {/* Zone 1: Clean single-line Brand Wordmark */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4 sm:gap-8">
+        {/* Zone 1: Brand Lockup (SIEB + Subtitle) */}
         <button
           type="button"
           onClick={() => onNavigate('home')}
-          className="font-display text-base sm:text-lg font-bold tracking-tight text-[#F4E6C4] hover:text-[#E5C17B] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C8A461]"
+          className="flex flex-col items-start text-left leading-none min-w-0 shrink cursor-pointer group focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C8A461]"
         >
-          Escalas do Batalhão
+          <span className="font-display text-base sm:text-lg font-bold tracking-[0.06em] text-[#F4E6C4] group-hover:text-[#E5C17B] transition-colors whitespace-nowrap">
+            SIEB
+          </span>
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#98A89F] tracking-tight mt-0.5 truncate max-w-[215px] sm:max-w-none">
+            Sistema Integrado de Escalas do Batalhão
+          </span>
         </button>
 
         {/* Zone 2: Clean single-line text navigation links with sliding gold indicator */}
@@ -70,19 +75,21 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             type="button"
             onClick={onAdminAction}
-            className={`btl-btn min-h-[40px] px-4 py-2 text-xs sm:text-sm ${
+            className={`btl-btn min-h-[40px] px-3 sm:px-4 py-2 text-xs sm:text-sm ${
               isAdminActive ? 'btl-btn-danger' : 'btl-btn-gold'
             }`}
           >
             {isAdminActive ? (
               <>
                 <LogOut className="w-4 h-4 shrink-0" />
-                <span>Sair do Admin</span>
+                <span className="hidden sm:inline">Sair do Admin</span>
+                <span className="sm:hidden">Sair</span>
               </>
             ) : (
               <>
                 <Lock className="w-3.5 h-3.5 shrink-0" />
-                <span>Área Administrativa</span>
+                <span className="hidden sm:inline">Área Administrativa</span>
+                <span className="sm:hidden">Admin</span>
               </>
             )}
           </button>
@@ -100,8 +107,8 @@ export const MobileBottomNav: React.FC<{
   const items: { id: AppView; label: string; icon: React.ReactNode; action: () => void }[] = [
     { id: 'home', label: 'Início', icon: <Home className="w-5 h-5" />, action: () => onNavigate('home') },
     { id: 'schedules', label: 'Escalas', icon: <CalendarDays className="w-5 h-5" />, action: () => onNavigate('schedules') },
+    { id: 'matrix', label: 'Planilha', icon: <TableProperties className="w-5 h-5" />, action: () => onNavigate('matrix') },
     { id: 'search', label: 'Buscar', icon: <Search className="w-5 h-5" />, action: () => onNavigate('search') },
-    { id: 'history', label: 'Histórico', icon: <History className="w-5 h-5" />, action: () => onNavigate('history') },
     { id: 'admin', label: 'Admin', icon: <Lock className="w-5 h-5" />, action: onAdminAction },
   ];
 
