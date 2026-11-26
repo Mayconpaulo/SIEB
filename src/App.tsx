@@ -16,7 +16,6 @@ import { auth } from './lib/firebase';
 import { TRANSITION_VIEW, VIEW_VARIANTS } from './lib/motion';
 import {
   subscribeToCalendarDays,
-  subscribeToLeaves,
   subscribeToMissions,
   subscribeToPersonnel,
 } from './lib/personnelService';
@@ -28,7 +27,6 @@ import {
 import type {
   AuditLogEntry,
   CalendarDayOverride,
-  LeaveRecord,
   MissionRecord,
   PersonnelProfile,
   ScheduleEntry,
@@ -45,7 +43,6 @@ export default function App() {
   const [entriesBySchedule, setEntriesBySchedule] = useState<Record<string, ScheduleEntry[]>>({});
   const [personnel, setPersonnel] = useState<PersonnelProfile[]>([]);
   const [missions, setMissions] = useState<MissionRecord[]>([]);
-  const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [calendarDays, setCalendarDays] = useState<Record<string, CalendarDayOverride>>({});
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
@@ -97,18 +94,16 @@ export default function App() {
     };
   }, [schedules, isCloudSynced]);
 
-  // Real-time subscriptions to centralized personnel, missions, and official leaves
+  // Real-time subscriptions to centralized personnel, missions, and calendar overrides
   const isAdminSessionActive = activeView === 'admin' && Boolean(adminToken);
 
   useEffect(() => {
     const unsubPersonnel = subscribeToPersonnel(isAdminSessionActive, setPersonnel);
     const unsubMissions = subscribeToMissions(isAdminSessionActive, setMissions);
-    const unsubLeaves = subscribeToLeaves(isAdminSessionActive, setLeaves);
     const unsubCalendarDays = subscribeToCalendarDays(setCalendarDays);
     return () => {
       unsubPersonnel();
       unsubMissions();
-      unsubLeaves();
       unsubCalendarDays();
     };
   }, [isAdminSessionActive]);
@@ -243,7 +238,6 @@ export default function App() {
                     schedules={schedules}
                     entriesBySchedule={entriesBySchedule}
                     missions={missions}
-                    leaves={leaves}
                     calendarDays={calendarDays}
                     todayIso={todayIso}
                   />
@@ -273,7 +267,6 @@ export default function App() {
                     entriesBySchedule={entriesBySchedule}
                     personnel={personnel}
                     missions={missions}
-                    leaves={leaves}
                     calendarDays={calendarDays}
                     auditLogs={auditLogs}
                     todayIso={todayIso}

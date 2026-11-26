@@ -40,6 +40,22 @@ export const SCALE_MODE_LABELS: Record<PersonnelScaleMode, string> = {
   none: 'Não concorre',
 };
 
+export type BlockedPeriodScope = 'all' | 'black' | 'red';
+
+export const BLOCKED_SCOPE_LABELS: Record<BlockedPeriodScope, string> = {
+  all: 'Preta e Vermelha',
+  black: 'Somente Preta',
+  red: 'Somente Vermelha',
+};
+
+export interface BlockedPeriod {
+  id: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  scope: BlockedPeriodScope;
+  reason: string;
+}
+
 export interface PersonnelProfile {
   id: string;
   fullName: string;
@@ -49,6 +65,7 @@ export interface PersonnelProfile {
   normalizedKey: string;
   active: boolean;
   scaleMode?: PersonnelScaleMode; // Defaults to 'both' when omitted on legacy records
+  blockedPeriods?: BlockedPeriod[]; // Specific date intervals where soldier cannot pull duty
   createdAt?: string;
   updatedAt?: string;
 }
@@ -75,29 +92,19 @@ export interface MissionRecord {
   updatedAt?: string;
 }
 
-export interface LeaveRecord {
-  id: string;
-  personId: string;
-  startDate: string; // YYYY-MM-DD
-  endDate: string; // YYYY-MM-DD
-  reason: string;
-  status: RecordStatus;
-  createdAt?: string;
-  updatedAt?: string;
-}
+export type ActivityCode = 'P' | 'V' | 'M' | 'R' | 'X' | '—';
 
-export type ActivityCode = 'P' | 'V' | 'M' | 'F' | 'X' | '—';
-
-export type ActiveEventCode = 'P' | 'V' | 'M' | 'F';
+export type ActiveEventCode = 'P' | 'V' | 'M';
 
 export interface MatrixDayEvent {
   code: ActiveEventCode;
-  source: 'schedule' | 'mission' | 'leave';
+  source: 'schedule' | 'mission';
   label: string;
   detail: string;
+  shortLabel: string;
+  restBeforeDuty?: number | null;
   scheduleId?: string;
   missionId?: string;
-  leaveId?: string;
 }
 
 export interface MatrixCellData {
@@ -105,6 +112,8 @@ export interface MatrixCellData {
   primaryCode: ActivityCode;
   codes: ActiveEventCode[];
   events: MatrixDayEvent[];
+  displayLabel?: string;
+  restDayNumber?: number;
   blockedReason?: string;
 }
 
@@ -113,10 +122,11 @@ export interface MatrixRowSummary {
   redCount: number; // V
   missionDays: number; // M days
   missionCount: number; // distinct missions in period
-  leaveDays: number; // F (officially granted leaves)
+  restDays: number; // Automatic folga days (1, 2, 3...) counted in period
+  currentRestDays: number | null; // Most recent consecutive folga day number in period
   blockedDays: number; // X (days where soldier does not compete for that scale)
   engagedDays: number; // unique days with P, V, or M
-  unregisteredDays: number; // days with '—' (distinct from F and X)
+  unregisteredDays: number; // days with '—' before first duty
 }
 
 export interface RestOrderCandidate {

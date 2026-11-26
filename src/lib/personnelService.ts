@@ -16,7 +16,6 @@ import {
   SCALE_MODE_LABELS,
   type CalendarDayOverride,
   type ImportPreviewItem,
-  type LeaveRecord,
   type MissionRecord,
   type PersonnelProfile,
   type PersonnelScaleMode,
@@ -133,49 +132,11 @@ export function subscribeToMissions(
   );
 }
 
-export function subscribeToLeaves(
-  isAdminMode: boolean,
-  onData: (list: LeaveRecord[]) => void,
-  onError?: (err: Error) => void
-): () => void {
-  const q = isAdminMode
-    ? query(collection(db, 'leaves'))
-    : query(collection(db, 'leaves'), where('status', '==', 'active'));
-
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const list: LeaveRecord[] = snapshot.docs.map((snap) => {
-        const d = snap.data();
-        return {
-          id: snap.id,
-          personId: String(d.personId ?? ''),
-          startDate: String(d.startDate ?? ''),
-          endDate: String(d.endDate ?? ''),
-          reason: String(d.reason ?? ''),
-          status: d.status === 'cancelled' ? 'cancelled' : 'active',
-          createdAt: formatTimestamp(d.createdAt),
-          updatedAt: formatTimestamp(d.updatedAt),
-        };
-      });
-      list.sort((a, b) => b.startDate.localeCompare(a.startDate));
-      onData(list);
-    },
-    (error) => {
-      try {
-        handleFirestoreError(error, OperationType.LIST, 'leaves');
-      } catch (wrapped) {
-        if (onError) onError(wrapped as Error);
-      }
-    }
-  );
-}
-
 export function subscribeToCalendarDays(
   onData: (daysByDate: Record<string, CalendarDayOverride>) => void,
   onError?: (err: Error) => void
 ): () => void {
-  const q = query(collection(db, 'calendar_days'));
+  const q = query(collection(db, 'calendar_days'), where('active', '==', true));
   return onSnapshot(
     q,
     (snapshot) => {
@@ -229,6 +190,7 @@ export async function saveCalendarDayOverride(
       date,
       isRedScale,
       holidayLabel: cleanHoliday,
+      active: true,
       updatedAt: serverTimestamp(),
     });
 
@@ -551,7 +513,7 @@ export async function setPersonnelActiveStatus(
         0,
         BLUEPRINT_LIMITS.MAX_SUMMARY_LEN
       ),
-      details: 'Histórico de serviços, missões e folgas preservado integralmente.',
+      details: 'Histórico de serviços e missões preservado integralmente.',
       actorLabel: 'Administrador',
       createdAt: serverTimestamp(),
     });
@@ -809,86 +771,6 @@ export async function deleteMission(adminToken: string, mission: MissionRecord):
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `missions/${mission.id}`);
-  }
-}
-
-// --- Official Leaves (Folgas) CRUD ---
-
-export async function createLeave(
-  adminToken: string,
-  input: { personId: string; personLabel: string; startDate: string; endDate: string; reason: string }
-): Promise<string> {
-  await verifyServerAdminToken(adminToken);
-
-  if (!BLUEPRINT_LIMITS.ID_REGEX.test(input.personId)) {
-    throw new Error('Selecione um militar válido para registrar a folga.');
-  }
-  if (!BLUEPRINT_LIMITS.DATE_REGEX.test(input.startDate) || !BLUEPRINT_LIMITS.DATE_REGEX.test(input.endDate)) {
-    throw new Error('Datas da folga inválidas.');
-  }
-  if (input.endDate < input.startDate) {
-    throw new Error('A data final não pode ser anterior à data inicial.');
-  }
-
-  const id = createDocId('flg');
-  const reason = input.reason.trim().slice(0, BLUEPRINT_LIMITS.MAX_REASON_LEN);
-
-  try {
-    const batch = writeBatch(db);
-    batch.set(doc(db, 'leaves', id), {
-      id,
-      personId: input.personId,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      reason,
-      status: 'active',
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    batch.set(doc(db, 'audit_logs', createDocId('log')), {
-      action: 'create_leave',
-      scheduleId: id,
-      scheduleName: 'Folgas',
-      summary: `Folga registrada: ${input.personLabel} (${input.startDate} a ${input.endDate})`.slice(
-        0,
-        BLUEPRINT_LIMITS.MAX_SUMMARY_LEN
-      ),
-      details: reason || 'Folga oficialmente concedida.',
-      actorLabel: 'Administrador',
-      createdAt: serverTimestamp(),
-    });
-
-    await batch.commit();
-    return id;
-  } catch (error) {
-    handleFirestoreError(error, OperationType.CREATE, `leaves/${id}`);
-  }
-}
-
-export async function deleteLeave(
-  adminToken: string,
-  leave: LeaveRecord,
-  personLabel: string
-): Promise<void> {
-  await verifyServerAdminToken(adminToken);
-
-  try {
-    await deleteDoc(doc(db, 'leaves', leave.id));
-    await setDoc(doc(db, 'audit_logs', createDocId('log')), {
-      action: 'delete_leave',
-      scheduleId: leave.id,
-      scheduleName: 'Folgas',
-      summary: `Folga removida: ${personLabel} (${leave.startDate} a ${leave.endDate})`.slice(
-        0,
-        BLUEPRINT_LIMITS.MAX_SUMMARY_LEN
-      ),
-      details: leave.reason || 'Registro de folga excluído pela administração.',
-      actorLabel: 'Administrador',
-      createdAt: serverTimestamp(),
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, `leaves/${leave.id}`);
   }
 }
 

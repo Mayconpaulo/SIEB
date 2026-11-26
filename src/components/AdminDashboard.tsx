@@ -62,7 +62,6 @@ import {
   type AuditLogEntry,
   type CalendarDayOverride,
   type ColumnKind,
-  type LeaveRecord,
   type MissionRecord,
   type PersonnelProfile,
   type PersonnelScaleMode,
@@ -83,7 +82,6 @@ interface AdminDashboardProps {
   entriesBySchedule: Record<string, ScheduleEntry[]>;
   personnel: PersonnelProfile[];
   missions: MissionRecord[];
-  leaves: LeaveRecord[];
   calendarDays: Record<string, CalendarDayOverride>;
   auditLogs: AuditLogEntry[];
   todayIso: string;
@@ -102,7 +100,7 @@ interface DiffItem {
 
 const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'entries', label: 'Editar Escalas', icon: Table2 },
-  { id: 'missions', label: 'Missões e Folgas', icon: Briefcase },
+  { id: 'missions', label: 'Missões', icon: Briefcase },
   { id: 'personnel', label: 'Efetivo', icon: Users },
   { id: 'matrix', label: 'Planilha', icon: TableProperties },
   { id: 'models', label: 'Modelos', icon: Layers },
@@ -116,7 +114,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   entriesBySchedule,
   personnel,
   missions,
-  leaves,
   calendarDays,
   auditLogs,
   todayIso,
@@ -997,7 +994,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   isRedScale: entry.isRedScale,
                                   entriesBySchedule: liveEntriesBySchedule,
                                   missions,
-                                  leaves,
                                   calendarDays,
                                   defaultRankFilter: inferRankFilterFromScheduleContext(
                                     `${selectedSchedule.name} ${col.label}`,
@@ -1059,7 +1055,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </motion.div>
         )}
 
-        {/* TAB 2: MISSIONS & OFFICIAL LEAVES */}
+        {/* TAB 2: MISSIONS */}
         {activeTab === 'missions' && (
           <motion.div
             key="tab-missions"
@@ -1073,7 +1069,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               adminToken={adminToken}
               personnel={personnel}
               missions={missions}
-              leaves={leaves}
               busyMessage={busyMessage}
               setBusyMessage={setBusyMessage}
               setFeedback={setFeedback}
@@ -1118,7 +1113,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               schedules={schedules}
               entriesBySchedule={entriesBySchedule}
               missions={missions}
-              leaves={leaves}
               calendarDays={calendarDays}
               todayIso={todayIso}
               isAdmin

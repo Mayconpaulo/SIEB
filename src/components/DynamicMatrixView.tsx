@@ -26,7 +26,6 @@ import {
   type ActiveEventCode,
   type ActivityCode,
   type CalendarDayOverride,
-  type LeaveRecord,
   type MatrixCellData,
   type MatrixPersonnelRow,
   type MissionRecord,
@@ -41,7 +40,6 @@ interface DynamicMatrixViewProps {
   schedules: ScheduleModel[];
   entriesBySchedule: Record<string, ScheduleEntry[]>;
   missions: MissionRecord[];
-  leaves: LeaveRecord[];
   calendarDays?: Record<string, CalendarDayOverride>;
   todayIso: string;
   isAdmin?: boolean;
@@ -75,13 +73,13 @@ const BLOCKED_CELL_CLASS =
 function getCellBadgeStyle(code: ActivityCode): string {
   switch (code) {
     case 'P':
-      return 'bg-[#2D5A43]/42 text-[#A8D8BE] border-[#83B499]/40';
+      return 'bg-[#2D5A43]/45 text-[#A8D8BE] border-[#83B499]/42';
     case 'V':
-      return 'bg-[#7F1D1D]/48 text-[#FCA5A5] border-[#F87171]/45';
+      return 'bg-[#7F1D1D]/52 text-[#FCA5A5] border-[#F87171]/48';
     case 'M':
       return 'bg-[#C8A461]/28 text-[#F4E6C4] border-[#E5C17B]/48';
-    case 'F':
-      return 'bg-[#075985]/42 text-[#7DD3FC] border-[#38BDF8]/42';
+    case 'R':
+      return 'bg-[#075985]/22 text-[#7DD3FC] border-[#38BDF8]/25';
     case 'X':
       return `${BLOCKED_CELL_CLASS} text-[#7D8F85] border-[#697870]/45`;
     default:
@@ -110,8 +108,6 @@ function getEventDotLabel(code: ActiveEventCode): string {
       return 'Escala Vermelha';
     case 'M':
       return 'Missão';
-    case 'F':
-      return 'Folga Oficial';
   }
 }
 
@@ -120,7 +116,6 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
   schedules,
   entriesBySchedule,
   missions,
-  leaves,
   calendarDays,
   todayIso,
   isAdmin = false,
@@ -177,7 +172,6 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
         schedules,
         entriesBySchedule,
         missions,
-        leaves,
         calendarDays,
         startDate: activeRange.startDate,
         endDate: activeRange.endDate,
@@ -192,7 +186,6 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       schedules,
       entriesBySchedule,
       missions,
-      leaves,
       calendarDays,
       activeRange.startDate,
       activeRange.endDate,
@@ -249,7 +242,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
         <span
           title={cell.blockedReason ?? 'Não concorre a esta escala'}
           aria-label={cell.blockedReason ?? 'Não concorre'}
-          className={`inline-flex items-center justify-center w-full min-w-[28px] h-[26px] rounded-md border ${getCellBadgeStyle(
+          className={`inline-flex items-center justify-center w-full min-w-[44px] h-[28px] rounded-md border ${getCellBadgeStyle(
             'X'
           )} select-none`}
         >
@@ -257,17 +250,36 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
         </span>
       );
     }
+    if (cell.primaryCode === 'R' && cell.restDayNumber !== undefined) {
+      return (
+        <span
+          title={`Folga · ${cell.restDayNumber}º dia sem serviço`}
+          className="inline-flex items-center justify-center min-w-[26px] h-[26px] px-1.5 rounded-md font-mono text-xs font-semibold tabular-nums text-[#7DD3FC]/90 bg-[#075985]/16 border border-[#38BDF8]/20 select-none"
+        >
+          {cell.restDayNumber}
+        </span>
+      );
+    }
     if (cell.primaryCode === '—') {
       return <span className="text-[#4F6056] select-none">—</span>;
     }
-    const label = cell.codes.length > 1 ? cell.codes.slice(0, 2).join('+') : cell.primaryCode;
+
+    const label = cell.displayLabel || cell.primaryCode;
+    const hasMissionOverlay =
+      (cell.primaryCode === 'P' || cell.primaryCode === 'V') && cell.codes.includes('M');
+
     return (
       <span
-        className={`inline-flex items-center justify-center min-w-[28px] h-[26px] px-1.5 rounded-md border font-mono text-[11px] font-bold tracking-tight ${getCellBadgeStyle(
+        className={`inline-flex flex-col items-center justify-center w-full min-h-[28px] px-1.5 py-0.5 rounded-md border font-mono text-[10px] leading-[1.15] font-bold tracking-tight text-center ${getCellBadgeStyle(
           cell.primaryCode
         )}`}
       >
-        {label}
+        <span className="break-words">{label}</span>
+        {hasMissionOverlay && (
+          <span className="text-[8px] leading-none text-[#F4E6C4] font-semibold mt-0.5">
+            +M
+          </span>
+        )}
       </span>
     );
   };
@@ -298,20 +310,20 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
           </div>
         </div>
 
-        {/* Fixed Color Legend (explicitly required by Section 7) */}
+        {/* Fixed Color Legend */}
         <div
           aria-label="Legenda da planilha"
           className="btl-panel px-3.5 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs"
         >
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center w-6 h-5 rounded border font-mono text-[11px] font-bold bg-[#2D5A43]/42 text-[#A8D8BE] border-[#83B499]/40">
-              P
+            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[10px] font-bold bg-[#2D5A43]/45 text-[#A8D8BE] border-[#83B499]/42">
+              SV
             </span>
             <span>Preta</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center w-6 h-5 rounded border font-mono text-[11px] font-bold bg-[#7F1D1D]/48 text-[#FCA5A5] border-[#F87171]/45">
-              V
+            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[10px] font-bold bg-[#7F1D1D]/52 text-[#FCA5A5] border-[#F87171]/48">
+              SV
             </span>
             <span>Vermelha</span>
           </span>
@@ -322,8 +334,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             <span>Missão</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center w-6 h-5 rounded border font-mono text-[11px] font-bold bg-[#075985]/42 text-[#7DD3FC] border-[#38BDF8]/42">
-              F
+            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[11px] font-semibold bg-[#075985]/16 text-[#7DD3FC] border-[#38BDF8]/25">
+              1 2 3
             </span>
             <span>Folga</span>
           </span>
@@ -334,7 +346,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             <span>Não concorre</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#98A89F]">
-            <span className="inline-flex items-center justify-center w-6 h-5 font-mono text-xs font-bold text-[#697870]">
+            <span className="inline-flex items-center justify-center w-5 h-5 font-mono text-xs font-bold text-[#697870]">
               —
             </span>
             <span>Sem registro</span>
@@ -593,8 +605,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                       <div className="font-bold text-[#E4EAE6]">{row.summary.missionDays}</div>
                     </div>
                     <div className="rounded-lg bg-[#075985]/22 border border-[#38BDF8]/25 py-1.5">
-                      <div className="text-[10px] text-[#7DD3FC]">F</div>
-                      <div className="font-bold text-[#E4EAE6]">{row.summary.leaveDays}</div>
+                      <div className="text-[10px] text-[#7DD3FC]">Folga</div>
+                      <div className="font-bold text-[#E4EAE6]">{row.summary.restDays}</div>
                     </div>
                     <div className="rounded-lg bg-[#0C1310]/80 border border-[#EBE0C8]/12 py-1.5">
                       <div className="text-[10px] text-[#98A89F]">Emp</div>
@@ -643,7 +655,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                             {d.dayNumber}
                           </div>
                           {d.holidayLabel && (
-                            <div className="text-[8px] font-medium truncate max-w-[44px] mt-0.5 text-[#FCA5A5]">
+                            <div className="text-[8px] font-medium truncate max-w-[66px] mt-0.5 text-[#FCA5A5]">
                               {d.holidayLabel}
                             </div>
                           )}
@@ -659,7 +671,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                               ? `${formatFullDatePt(d.date)} · ${d.holidayLabel}${isAdmin ? ' (clique para editar)' : ''}`
                               : `${formatFullDatePt(d.date)} · ${d.isRedScale ? 'Escala Vermelha' : 'Escala Preta'}${isAdmin ? ' (clique para editar)' : ''}`
                           }
-                          className={`p-0 text-center border-r border-[#EBE0C8]/8 min-w-[46px] ${
+                          className={`p-0 text-center border-r border-[#EBE0C8]/8 min-w-[68px] sm:min-w-[78px] ${
                             isToday
                               ? 'bg-[#12261C] text-[#A8D8BE]'
                               : d.isRedScale
@@ -714,21 +726,21 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                     </th>
                     <th
                       scope="col"
-                      title="Folgas Oficiais Concedidas"
-                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#7DD3FC] bg-[#0B1822] border-l border-[#EBE0C8]/10 min-w-[42px]"
+                      title="Dias de Folga Automática no Período"
+                      className="px-2.5 py-3 text-center text-[11px] font-mono font-bold text-[#7DD3FC] bg-[#0B1822] border-l border-[#EBE0C8]/10 whitespace-nowrap min-w-[52px]"
                     >
-                      F
+                      Folga
                     </th>
                     <th
                       scope="col"
-                      title="Dias Empenhados (P + V + M)"
+                      title="Dias Empenhados (Serviços + Missões)"
                       className="px-2.5 py-3 text-center text-[11px] font-mono font-semibold text-[#F4E6C4] bg-[#0B120E] border-l border-[#EBE0C8]/12 whitespace-nowrap min-w-[54px]"
                     >
                       Emp.
                     </th>
                     <th
                       scope="col"
-                      title="Dias sem Empenho Registrado"
+                      title="Dias sem Serviço Anterior Registrado"
                       className="px-2.5 py-3 text-center text-[11px] font-mono font-semibold text-[#98A89F] bg-[#0B120E] border-l border-[#EBE0C8]/10 whitespace-nowrap min-w-[58px]"
                     >
                       S/ Reg.
@@ -801,7 +813,13 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                               <button
                                 type="button"
                                 title={cell.events
-                                  .map((ev) => `${ev.code}: ${ev.label} (${ev.detail})`)
+                                  .map((ev) => {
+                                    const folgaNote =
+                                      ev.restBeforeDuty !== null && ev.restBeforeDuty !== undefined
+                                        ? ` · Folga ${ev.restBeforeDuty}×1`
+                                        : '';
+                                    return `${ev.detail} — ${ev.label} (${getEventDotLabel(ev.code)}${folgaNote})`;
+                                  })
                                   .join(' | ')}
                                 onClick={() =>
                                   setInspectedPersonId({
@@ -809,7 +827,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                     focusDate: d.date,
                                   })
                                 }
-                                className="inline-flex items-center justify-center cursor-pointer hover:scale-105 transition-transform"
+                                className="w-full inline-flex items-center justify-center cursor-pointer hover:scale-[1.03] transition-transform"
                               >
                                 {renderCellContent(cell)}
                               </button>
@@ -831,7 +849,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                         {row.summary.missionDays}
                       </td>
                       <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#7DD3FC] bg-[#0B1822]/60 border-l border-[#EBE0C8]/10">
-                        {row.summary.leaveDays}
+                        {row.summary.restDays}
                       </td>
                       <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#F4E6C4] border-l border-[#EBE0C8]/12">
                         {row.summary.engagedDays}
@@ -956,7 +974,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 <div className="rounded-lg bg-[#075985]/22 border border-[#38BDF8]/30 py-2">
                   <div className="text-[10px] text-[#7DD3FC]">Folgas</div>
                   <div className="text-sm font-bold text-[#E4EAE6]">
-                    {inspectedRow.row.summary.leaveDays}
+                    {inspectedRow.row.summary.restDays}
                   </div>
                 </div>
                 <div className="rounded-lg bg-[#0C1310] border border-[#EBE0C8]/15 py-2">
@@ -1000,20 +1018,25 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                 className="flex items-start gap-2.5 text-xs"
                               >
                                 <span
-                                  className={`inline-flex items-center justify-center min-w-[24px] h-5 px-1 rounded border font-mono text-[10px] font-bold shrink-0 ${getCellBadgeStyle(
+                                  className={`inline-flex items-center justify-center min-w-[28px] h-5 px-1.5 rounded border font-mono text-[10px] font-bold shrink-0 ${getCellBadgeStyle(
                                     ev.code
                                   )}`}
                                 >
-                                  {ev.code}
+                                  {ev.shortLabel}
                                 </span>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                   <span className="font-semibold text-[#E4EAE6]">
-                                    {ev.label}
+                                    {ev.detail}
                                   </span>
                                   <span className="text-[#697870] mx-1.5">·</span>
                                   <span className="text-[#98A89F]">
-                                    {ev.detail} ({getEventDotLabel(ev.code)})
+                                    {ev.label} ({getEventDotLabel(ev.code)})
                                   </span>
+                                  {ev.restBeforeDuty !== null && ev.restBeforeDuty !== undefined && (
+                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-[#075985]/28 border border-[#38BDF8]/30 font-mono text-[10px] font-semibold text-[#7DD3FC]">
+                                      Folga {ev.restBeforeDuty}×1
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             ))}

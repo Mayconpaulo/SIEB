@@ -150,6 +150,10 @@
           "enum": ["both", "black_only", "red_only", "none"],
           "description": "Elegibilidade de escala do militar: ambas, somente preta, somente vermelha ou dispensado."
         },
+        "blockedPeriods": {
+          "type": "array",
+          "description": "Períodos específicos de datas em que o militar não pode concorrer a serviço (até 20 períodos)."
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -430,12 +434,15 @@
           "type": "string",
           "maxLength": 60
         },
+        "active": {
+          "type": "boolean"
+        },
         "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["date", "isRedScale", "holidayLabel", "updatedAt"]
+      "required": ["date", "isRedScale", "holidayLabel", "active", "updatedAt"]
     }
   },
   "firestore": {

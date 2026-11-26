@@ -5,7 +5,6 @@ import type {
   DayOfWeek,
   ImportPreviewItem,
   ImportRowCandidate,
-  LeaveRecord,
   MatrixCellData,
   MatrixDayEvent,
   MatrixPersonnelRow,
@@ -368,11 +367,85 @@ export function getMonthDateRange(year: number, monthIndex0: number): {
 
 /** Priority order when resolving primary cell display code if multiple activities coexist on the same date */
 const CODE_PRIORITY: Record<ActiveEventCode, number> = {
-  V: 4,
-  P: 3,
-  M: 2,
-  F: 1,
+  V: 3,
+  P: 2,
+  M: 1,
 };
+
+const DUTY_WORD_ABBREVS: [RegExp, string][] = [
+  [/\bCOMANDANTE\b/gi, 'CMT'],
+  [/\bSUBCOMANDANTE\b/gi, 'SCMT'],
+  [/\bGUARDA\b/gi, 'GDA'],
+  [/\bBATALH[AÃ]O\b/gi, 'BTL'],
+  [/\bPELOT[AÃ]O\b/gi, 'PEL'],
+  [/\bSEGURAN[CÇ]A\b/gi, 'SEG'],
+  [/\bOFICIAL\b/gi, 'OF'],
+  [/\bADJUNTO\b/gi, 'ADJ'],
+  [/\bAUXILIAR\b/gi, 'AUX'],
+  [/\bSUPERVISOR\b/gi, 'SUP'],
+  [/\bREFER[EÊ]NCIA\b/gi, 'REF'],
+  [/\bCABO\b/gi, 'CB'],
+  [/\bSARGENTO\b/gi, 'SGT'],
+  [/\bSOLDADO\b/gi, 'SD'],
+  [/\bT[EÉ]CNICO\b/gi, 'TÉC'],
+  [/\bENFERMAGEM\b/gi, 'ENF'],
+  [/\bCORNETEIRO\b/gi, 'CORN'],
+  [/\bPADIOLEIRO\b/gi, 'PAD'],
+  [/\bMOTORISTA\b/gi, 'MOT'],
+  [/\bPERMAN[EÊ]NCIA\b/gi, 'PERM'],
+  [/\bSENTINELA\b/gi, 'SENT'],
+  [/\bPLANT[AÃ]O\b/gi, 'PLANT'],
+  [/\bGRUPO\b/gi, 'G'],
+  [/\bVILA\s+DOS\s+OFICIAIS\b/gi, 'VILA OF'],
+];
+
+/**
+ * Formats a schedule column/duty name into a concise, authentic military abbreviation
+ * for direct display inside matrix cells (e.g. "Comandante da Guarda" -> "CMT GDA",
+ * "Cb G Seg XI" -> "CB G SEG XI").
+ */
+export function abbreviateDutyLabel(rawLabel: string): string {
+  let text = rawLabel.trim();
+  if (!text) return 'SV';
+
+  const withoutParen = text.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  if (withoutParen.length >= 3) {
+    text = withoutParen;
+  }
+
+  for (const [pattern, replacement] of DUTY_WORD_ABBREVS) {
+    text = text.replace(pattern, replacement);
+  }
+
+  text = text.replace(/\s+/g, ' ').trim().toUpperCase();
+
+  // Strip Portuguese connector prepositions while keeping division designations like "1ª DE" intact
+  text = text
+    .replace(/\b(DA|DO|DOS|DAS|AO|AOS|EM|NA|NO|NAS|NOS)\b/g, ' ')
+    .replace(/(\d[ªº°])\s+DE\b/g, '$1_DE_UNIT')
+    .replace(/\bDE\b/g, ' ')
+    .replace(/_DE_UNIT/g, ' DE')
+    .replace(/\bSP\b/g, 'SUP')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (text.length > 13 && !/^(OF|ADJ OF) DIA$/.test(text)) {
+    text = text.replace(/\bDIA\b/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  if (text.length > 15) {
+    const words = text.split(' ');
+    let out = '';
+    for (const w of words) {
+      const next = out ? `${out} ${w}` : w;
+      if (next.length <= 15) out = next;
+      else break;
+    }
+    text = out || text.slice(0, 15);
+  }
+
+  return text || 'SV';
+}
 
 export function getEffectiveScaleMode(person: Pick<PersonnelProfile, 'scaleMode'>): PersonnelScaleMode {
   return person.scaleMode ?? 'both';
@@ -467,15 +540,17 @@ export interface DynamicMatrixResult {
 
 /**
  * Pure, reactive Dynamic Matrix builder:
- * Computes every military member's day-by-day status (P, V, M, F, X, —), preserves overlapping records
- * on the same day without overwriting, enforces per-soldier scale restrictions, and calculates accurate summaries.
+ * Computes every military member's day-by-day status:
+ * - Duty cells (P/V) display the abbreviated duty function name (e.g. "CMT GDA", "CB G SEG XI")
+ * - Mission cells display "M"
+ * - Automatic rest days (R) display sequential numbers 1, 2, 3... counting days off since last duty
+ * - Blocked days (X) honor per-soldier scale restrictions
  */
 export function buildDynamicMatrix(params: {
   personnel: PersonnelProfile[];
   schedules: ScheduleModel[];
   entriesBySchedule: Record<string, ScheduleEntry[]>;
   missions: MissionRecord[];
-  leaves: LeaveRecord[];
   calendarDays?: Record<string, CalendarDayOverride>;
   startDate: string;
   endDate: string;
@@ -486,7 +561,6 @@ export function buildDynamicMatrix(params: {
     schedules,
     entriesBySchedule,
     missions,
-    leaves,
     calendarDays,
     startDate,
     endDate,
@@ -510,9 +584,11 @@ export function buildDynamicMatrix(params: {
     };
   });
 
-  // 1. Collect per-person, per-date events from ALL authoritative structured sources
+  // 1. Collect per-person, per-date events + most recent duty date strictly BEFORE startDate
   // Map<personId, Map<dateIso, MatrixDayEvent[]>>
   const eventsByPerson = new Map<string, Map<string, MatrixDayEvent[]>>();
+  const lastDutyBeforePeriodByPerson = new Map<string, string>();
+
   const ensureEvents = (personId: string, date: string): MatrixDayEvent[] => {
     let byDate = eventsByPerson.get(personId);
     if (!byDate) {
@@ -533,7 +609,10 @@ export function buildDynamicMatrix(params: {
     const entries = entriesBySchedule[schedule.id] ?? [];
 
     for (const entry of entries) {
-      if (!dateSet.has(entry.date)) continue;
+      const inRange = dateSet.has(entry.date);
+      const isBeforeRange = Boolean(startDate) && entry.date < startDate;
+      if (!inRange && !isBeforeRange) continue;
+
       const override = calendarDays?.[entry.date];
       const effectiveIsRed = override ? override.isRedScale : entry.isRedScale;
       const code: 'P' | 'V' = effectiveIsRed ? 'V' : 'P';
@@ -544,6 +623,14 @@ export function buildDynamicMatrix(params: {
 
         const matched = findMatchingPersonnel(effective, personnel);
         if (!matched) continue;
+
+        if (isBeforeRange) {
+          const prev = lastDutyBeforePeriodByPerson.get(matched.id);
+          if (!prev || entry.date > prev) {
+            lastDutyBeforePeriodByPerson.set(matched.id, entry.date);
+          }
+          continue;
+        }
 
         const colLabel = colLabelById.get(colId) ?? colId;
         const list = ensureEvents(matched.id, entry.date);
@@ -561,6 +648,7 @@ export function buildDynamicMatrix(params: {
             source: 'schedule',
             label: schedule.name,
             detail: colLabel,
+            shortLabel: abbreviateDutyLabel(colLabel),
             scheduleId: schedule.id,
           });
         }
@@ -582,28 +670,10 @@ export function buildDynamicMatrix(params: {
             source: 'mission',
             label: mission.title,
             detail: mission.location || 'Missão oficial',
+            shortLabel: 'M',
             missionId: mission.id,
           });
         }
-      }
-    }
-  }
-
-  // Source C: Officially Granted Leaves (F) — strictly separated from unregistered days (—)
-  for (const leave of leaves) {
-    if (leave.status !== 'active') continue;
-    const leaveDates = getIsoDateList(leave.startDate, leave.endDate, 120);
-    for (const d of leaveDates) {
-      if (!dateSet.has(d)) continue;
-      const list = ensureEvents(leave.personId, d);
-      if (!list.some((ev) => ev.source === 'leave' && ev.leaveId === leave.id)) {
-        list.push({
-          code: 'F',
-          source: 'leave',
-          label: 'Folga oficial',
-          detail: leave.reason || 'Folga concedida',
-          leaveId: leave.id,
-        });
       }
     }
   }
@@ -617,7 +687,7 @@ export function buildDynamicMatrix(params: {
     new Set(personnel.map((p) => p.company.trim()).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
-  // 2. Filter personnel rows (keep inactive personnel ONLY if includeInactive OR they have historical records in this period!)
+  // 2. Filter personnel rows (keep inactive personnel ONLY if includeInactive OR they have historical records in this period)
   const queryNorm = normalizeMilitaryText(filters?.searchQuery ?? '');
   const rankFilter = filters?.rankFilter ?? 'all';
   const companyFilter = filters?.companyFilter ?? 'all';
@@ -646,7 +716,7 @@ export function buildDynamicMatrix(params: {
   // Sort alphabetically by warName (stable, predictable roster ordering)
   filteredPersonnel.sort((a, b) => a.warName.localeCompare(b.warName, 'pt-BR'));
 
-  // 3. Build row cells + individual calculations
+  // 3. Build row cells + automatic sequential folga counters (1, 2, 3...) + individual calculations
   const rows: MatrixPersonnelRow[] = filteredPersonnel.map((person) => {
     const personEventsMap = eventsByPerson.get(person.id);
     const cellsByDate: Record<string, MatrixCellData> = {};
@@ -655,15 +725,18 @@ export function buildDynamicMatrix(params: {
     let blackCount = 0;
     let redCount = 0;
     let missionDays = 0;
-    let leaveDays = 0;
+    let restDays = 0;
+    let currentRestDays: number | null = null;
     let blockedDays = 0;
     let engagedDays = 0;
     let unregisteredDays = 0;
     const distinctMissionIds = new Set<string>();
 
+    let lastDutyDate: string | null = lastDutyBeforePeriodByPerson.get(person.id) ?? null;
+
     for (const d of dates) {
-      const dayEvents = personEventsMap?.get(d.date) ?? [];
-      if (dayEvents.length === 0) {
+      const rawDayEvents = personEventsMap?.get(d.date) ?? [];
+      if (rawDayEvents.length === 0) {
         const eligibility = isPersonEligibleForScale(person, d.isRedScale);
         if (!eligibility.eligible) {
           cellsByDate[d.date] = {
@@ -674,6 +747,17 @@ export function buildDynamicMatrix(params: {
             blockedReason: eligibility.reason,
           };
           blockedDays += 1;
+        } else if (lastDutyDate) {
+          const restNum = diffIsoDays(d.date, lastDutyDate);
+          cellsByDate[d.date] = {
+            date: d.date,
+            primaryCode: 'R',
+            codes: [],
+            events: [],
+            restDayNumber: restNum,
+          };
+          restDays += 1;
+          currentRestDays = restNum;
         } else {
           cellsByDate[d.date] = {
             date: d.date,
@@ -686,12 +770,26 @@ export function buildDynamicMatrix(params: {
         continue;
       }
 
-      // Deduplicate codes on this day in priority order (V > P > M > F)
+      const hasDutyToday = rawDayEvents.some((ev) => ev.source === 'schedule');
+      const restBeforeDuty =
+        hasDutyToday && lastDutyDate
+          ? Math.max(0, diffIsoDays(d.date, lastDutyDate) - 1)
+          : null;
+
+      const dayEvents: MatrixDayEvent[] = rawDayEvents.map((ev) =>
+        ev.source === 'schedule' ? { ...ev, restBeforeDuty } : ev
+      );
+
+      if (hasDutyToday) {
+        lastDutyDate = d.date;
+        currentRestDays = 0;
+      }
+
+      // Deduplicate codes on this day in priority order (V > P > M)
       const uniqueCodes = Array.from(new Set(dayEvents.map((e) => e.code))).sort(
         (a, b) => CODE_PRIORITY[b] - CODE_PRIORITY[a]
       );
 
-      // Count actual duty occurrences (a soldier doing 1 duty gets +1)
       for (const ev of dayEvents) {
         if (ev.code === 'P') blackCount += 1;
         if (ev.code === 'V') redCount += 1;
@@ -699,9 +797,16 @@ export function buildDynamicMatrix(params: {
       }
 
       if (uniqueCodes.includes('M')) missionDays += 1;
-      if (uniqueCodes.includes('F')) leaveDays += 1;
       if (uniqueCodes.includes('P') || uniqueCodes.includes('V') || uniqueCodes.includes('M')) {
         engagedDays += 1;
+      }
+
+      const scheduleEvents = dayEvents.filter((ev) => ev.source === 'schedule');
+      let displayLabel = uniqueCodes[0] as string;
+      if (scheduleEvents.length === 1) {
+        displayLabel = scheduleEvents[0].shortLabel;
+      } else if (scheduleEvents.length > 1) {
+        displayLabel = `${scheduleEvents[0].shortLabel} +${scheduleEvents.length - 1}`;
       }
 
       cellsByDate[d.date] = {
@@ -709,6 +814,7 @@ export function buildDynamicMatrix(params: {
         primaryCode: uniqueCodes[0],
         codes: uniqueCodes,
         events: dayEvents,
+        displayLabel,
       };
 
       historyInPeriod.push({
@@ -726,7 +832,8 @@ export function buildDynamicMatrix(params: {
         redCount,
         missionDays,
         missionCount: distinctMissionIds.size,
-        leaveDays,
+        restDays,
+        currentRestDays,
         blockedDays,
         engagedDays,
         unregisteredDays,
@@ -746,13 +853,12 @@ export function buildDynamicMatrix(params: {
 /**
  * Computes the military "Ordem de Folga" (Most Rested -> Least Rested) for a specific date & scale type (P or V).
  * Respects per-soldier scale restrictions (both / black_only / red_only / none) and flags soldiers already
- * busy on targetDate (duty, mission, or official leave).
+ * busy on targetDate (duty or mission).
  */
 export function computeRestOrderCandidates(params: {
   personnel: PersonnelProfile[];
   entriesBySchedule: Record<string, ScheduleEntry[]>;
   missions: MissionRecord[];
-  leaves: LeaveRecord[];
   calendarDays?: Record<string, CalendarDayOverride>;
   targetDate: string;
   isRedScale: boolean;
@@ -764,7 +870,6 @@ export function computeRestOrderCandidates(params: {
     personnel,
     entriesBySchedule,
     missions,
-    leaves,
     calendarDays,
     targetDate,
     isRedScale,
@@ -831,15 +936,6 @@ export function computeRestOrderCandidates(params: {
     }
   }
 
-  for (const leave of leaves) {
-    if (leave.status !== 'active') continue;
-    if (targetDate >= leave.startDate && targetDate <= leave.endDate) {
-      if (!busyReasonByPerson.has(leave.personId)) {
-        busyReasonByPerson.set(leave.personId, 'Folga oficial (F)');
-      }
-    }
-  }
-
   // Optional text query filtering (supports typing rank, war name, or full name)
   const rawQuery = query.trim();
   const fullNeedle = normalizeMilitaryText(rawQuery);
@@ -883,7 +979,10 @@ export function computeRestOrderCandidates(params: {
     const busyReason = busyReasonByPerson.get(person.id);
     const lastDutyDate = lastSameScaleDateByPerson.get(person.id) ?? null;
     const lastAnyDutyDate = lastAnyDutyDateByPerson.get(person.id) ?? null;
-    const daysSinceLastDuty = lastDutyDate ? diffIsoDays(targetDate, lastDutyDate) : null;
+    // Exact full days off between lastDutyDate and targetDate (e.g. duty Day 10 -> target Day 14 = 3 full rest days = 3x1)
+    const daysSinceLastDuty = lastDutyDate
+      ? Math.max(0, diffIsoDays(targetDate, lastDutyDate) - 1)
+      : null;
 
     candidates.push({
       person,

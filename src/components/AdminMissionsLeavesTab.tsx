@@ -1,29 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import {
-  Briefcase,
-  CalendarCheck2,
-  MapPin,
-  Pencil,
-  Plus,
-  Trash2,
-  Users,
-  X,
-} from 'lucide-react';
+import { Briefcase, MapPin, Pencil, Plus, Trash2, Users, X } from 'lucide-react';
 import { formatShortDatePt } from '../data/initialSchedules';
 import { formatPersonnelDisplay, parseMilitaryInput } from '../lib/matrixEngine';
-import { SPRING_MODAL, SPRING_TAB, TRANSITION_MICRO } from '../lib/motion';
+import { SPRING_MODAL, TRANSITION_MICRO } from '../lib/motion';
 import {
-  createLeave,
   createMission,
   createPersonnelProfile,
-  deleteLeave,
   deleteMission,
   updateMission,
 } from '../lib/personnelService';
 import {
   BLUEPRINT_LIMITS,
-  type LeaveRecord,
   type MissionRecord,
   type PersonnelProfile,
 } from '../types/schedule';
@@ -33,7 +21,6 @@ interface AdminMissionsLeavesTabProps {
   adminToken: string;
   personnel: PersonnelProfile[];
   missions: MissionRecord[];
-  leaves: LeaveRecord[];
   busyMessage: string;
   setBusyMessage: (msg: string) => void;
   setFeedback: (fb: { type: 'success' | 'error'; text: string } | null) => void;
@@ -44,14 +31,11 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
   adminToken,
   personnel,
   missions,
-  leaves,
   busyMessage,
   setBusyMessage,
   setFeedback,
   onActionError,
 }) => {
-  const [subTab, setSubTab] = useState<'missions' | 'leaves'>('missions');
-
   // Mission modal state
   const [editingMission, setEditingMission] = useState<{
     mode: 'create' | 'edit';
@@ -64,14 +48,6 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
     notes: string;
   } | null>(null);
   const [missionPersonQuery, setMissionPersonQuery] = useState('');
-
-  // Leave modal state
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [leavePersonInput, setLeavePersonInput] = useState('');
-  const [leavePerson, setLeavePerson] = useState<PersonnelProfile | null>(null);
-  const [leaveStart, setLeaveStart] = useState('2026-11-10');
-  const [leaveEnd, setLeaveEnd] = useState('2026-11-10');
-  const [leaveReason, setLeaveReason] = useState('');
 
   // Confirmation modal
   const [confirmDelete, setConfirmDelete] = useState<{
@@ -151,275 +127,135 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
     }
   };
 
-  const handleSaveLeave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    let target = leavePerson;
-    if (!target && leavePersonInput.trim()) {
-      target = await handleQuickCreatePerson(leavePersonInput.trim());
-    }
-    if (!target) {
-      setFeedback({ type: 'error', text: 'Selecione ou cadastre um militar para a folga.' });
-      return;
-    }
-
-    setBusyMessage('Registrando folga oficial...');
-    setFeedback(null);
-    try {
-      await createLeave(adminToken, {
-        personId: target.id,
-        personLabel: formatPersonnelDisplay(target),
-        startDate: leaveStart,
-        endDate: leaveEnd,
-        reason: leaveReason,
-      });
-      setShowLeaveModal(false);
-      setLeavePerson(null);
-      setLeavePersonInput('');
-      setLeaveReason('');
-      setFeedback({
-        type: 'success',
-        text: `Folga oficial registrada para ${formatPersonnelDisplay(target)}.`,
-      });
-    } catch (err) {
-      onActionError(err);
-    } finally {
-      setBusyMessage('');
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="btl-tab-track inline-flex items-center gap-1 self-start">
-          <button
-            type="button"
-            onClick={() => setSubTab('missions')}
-            className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg cursor-pointer ${
-              subTab === 'missions' ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
-            }`}
-          >
-            {subTab === 'missions' && (
-              <motion.span
-                layoutId="admin-ml-subtab"
-                transition={SPRING_TAB}
-                className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/22 to-[#2D5A43]/34 border border-[#C8A461]/45"
-              />
-            )}
-            <Briefcase className="w-4 h-4 relative z-10" />
-            <span className="relative z-10">Missões ({missions.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSubTab('leaves')}
-            className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg cursor-pointer ${
-              subTab === 'leaves' ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
-            }`}
-          >
-            {subTab === 'leaves' && (
-              <motion.span
-                layoutId="admin-ml-subtab"
-                transition={SPRING_TAB}
-                className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/22 to-[#2D5A43]/34 border border-[#C8A461]/45"
-              />
-            )}
-            <CalendarCheck2 className="w-4 h-4 relative z-10" />
-            <span className="relative z-10">Folgas Oficiais ({leaves.length})</span>
-          </button>
+        <div className="inline-flex items-center gap-2 text-[#F4E6C4]">
+          <Briefcase className="w-5 h-5 text-[#C8A461]" />
+          <h2 className="font-display text-lg font-semibold">
+            Missões ({missions.length})
+          </h2>
         </div>
 
-        {subTab === 'missions' ? (
-          <button
-            type="button"
-            onClick={() => {
-              setMissionPersonQuery('');
-              setEditingMission({
-                mode: 'create',
-                title: '',
-                location: '',
-                startDate: '2026-11-12',
-                endDate: '2026-11-14',
-                personnelIds: [],
-                notes: '',
-              });
-            }}
-            className="btl-btn btl-btn-primary text-xs sm:text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Nova missão</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              setLeavePerson(null);
-              setLeavePersonInput('');
-              setLeaveReason('');
-              setShowLeaveModal(true);
-            }}
-            className="btl-btn btl-btn-primary text-xs sm:text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Registrar folga</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            setMissionPersonQuery('');
+            setEditingMission({
+              mode: 'create',
+              title: '',
+              location: '',
+              startDate: '2026-11-12',
+              endDate: '2026-11-14',
+              personnelIds: [],
+              notes: '',
+            });
+          }}
+          className="btl-btn btl-btn-primary text-xs sm:text-sm self-start sm:self-auto"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Nova missão</span>
+        </button>
       </div>
 
       {/* MISSIONS LIST */}
-      {subTab === 'missions' ? (
-        missions.length === 0 ? (
-          <div className="btl-card p-10 text-center text-sm text-[#98A89F]">
-            Nenhuma missão cadastrada.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {missions.map((mission) => (
-              <div
-                key={mission.id}
-                className="btl-home-card p-5 flex flex-col justify-between gap-4"
-              >
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between gap-2 text-xs font-mono tabular-nums">
-                    <span className="text-[#E5C17B] font-semibold">
-                      {formatShortDatePt(mission.startDate)} – {formatShortDatePt(mission.endDate)}
-                    </span>
-                    <span className="text-[#98A89F] inline-flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" />
-                      {mission.personnelIds.length}
-                    </span>
-                  </div>
-
-                  <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
-                    {mission.title}
-                  </h3>
-
-                  {mission.location && (
-                    <div className="inline-flex items-center gap-1.5 text-xs text-[#98A89F]">
-                      <MapPin className="w-3.5 h-3.5 text-[#C8A461]" />
-                      <span>{mission.location}</span>
-                    </div>
-                  )}
-
-                  <div className="pt-2.5 border-t border-[#EBE0C8]/10 flex flex-wrap gap-1.5">
-                    {mission.personnelIds.length === 0 ? (
-                      <span className="text-xs text-[#697870]">Sem militares designados</span>
-                    ) : (
-                      mission.personnelIds.map((pid) => {
-                        const p = personById.get(pid);
-                        return (
-                          <span
-                            key={pid}
-                            className="px-2 py-0.5 rounded-md bg-[#C8A461]/15 border border-[#C8A461]/30 text-[11px] font-medium text-[#F4E6C4]"
-                          >
-                            {p ? formatPersonnelDisplay(p) : pid}
-                          </span>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#EBE0C8]/10">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMissionPersonQuery('');
-                      setEditingMission({
-                        mode: 'edit',
-                        original: mission,
-                        title: mission.title,
-                        location: mission.location,
-                        startDate: mission.startDate,
-                        endDate: mission.endDate,
-                        personnelIds: [...mission.personnelIds],
-                        notes: mission.notes,
-                      });
-                    }}
-                    className="btl-btn btl-btn-secondary min-h-[36px] px-3 py-1 text-xs"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-[#E5C17B]" />
-                    <span>Editar missão</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setConfirmDelete({
-                        title: 'Excluir missão',
-                        description: `Remover "${mission.title}" (${formatShortDatePt(mission.startDate)} – ${formatShortDatePt(mission.endDate)})? A marcação M será removida da planilha sem afetar outros registros nas mesmas datas.`,
-                        onConfirm: async () => {
-                          await deleteMission(adminToken, mission);
-                          setFeedback({
-                            type: 'success',
-                            text: `Missão "${mission.title}" excluída e planilha atualizada.`,
-                          });
-                        },
-                      })
-                    }
-                    className="btl-btn btl-btn-danger min-h-[36px] px-3 py-1 text-xs"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Excluir</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      ) : /* OFFICIAL LEAVES LIST */
-      leaves.length === 0 ? (
+      {missions.length === 0 ? (
         <div className="btl-card p-10 text-center text-sm text-[#98A89F]">
-          Nenhuma folga oficial registrada.
+          Nenhuma missão cadastrada.
         </div>
       ) : (
-        <div className="btl-card divide-y divide-[#EBE0C8]/10 overflow-hidden">
-          {leaves.map((leave) => {
-            const p = personById.get(leave.personId);
-            const label = p ? formatPersonnelDisplay(p) : leave.personId;
-            return (
-              <div
-                key={leave.id}
-                className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-[#E4EAE6]/[0.03]"
-              >
-                <div className="space-y-1">
-                  <div className="flex flex-wrap items-center gap-x-2 text-xs">
-                    <span className="font-mono font-semibold text-[#7DD3FC] tabular-nums">
-                      {formatShortDatePt(leave.startDate)}
-                      {leave.endDate !== leave.startDate
-                        ? ` – ${formatShortDatePt(leave.endDate)}`
-                        : ''}
-                    </span>
-                    <span aria-hidden="true" className="text-[#697870]">·</span>
-                    <span className="font-semibold text-[#F4E6C4]">{label}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {missions.map((mission) => (
+            <div
+              key={mission.id}
+              className="btl-home-card p-5 flex flex-col justify-between gap-4"
+            >
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-2 text-xs font-mono tabular-nums">
+                  <span className="text-[#E5C17B] font-semibold">
+                    {formatShortDatePt(mission.startDate)} – {formatShortDatePt(mission.endDate)}
+                  </span>
+                  <span className="text-[#98A89F] inline-flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" />
+                    {mission.personnelIds.length}
+                  </span>
+                </div>
+
+                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                  {mission.title}
+                </h3>
+
+                {mission.location && (
+                  <div className="inline-flex items-center gap-1.5 text-xs text-[#98A89F]">
+                    <MapPin className="w-3.5 h-3.5 text-[#C8A461]" />
+                    <span>{mission.location}</span>
                   </div>
-                  {leave.reason && (
-                    <div className="text-xs text-[#98A89F]">{leave.reason}</div>
+                )}
+
+                <div className="pt-2.5 border-t border-[#EBE0C8]/10 flex flex-wrap gap-1.5">
+                  {mission.personnelIds.length === 0 ? (
+                    <span className="text-xs text-[#697870]">Sem militares designados</span>
+                  ) : (
+                    mission.personnelIds.map((pid) => {
+                      const p = personById.get(pid);
+                      return (
+                        <span
+                          key={pid}
+                          className="px-2 py-0.5 rounded-md bg-[#C8A461]/15 border border-[#C8A461]/30 text-[11px] font-medium text-[#F4E6C4]"
+                        >
+                          {p ? formatPersonnelDisplay(p) : pid}
+                        </span>
+                      );
+                    })
                   )}
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#EBE0C8]/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMissionPersonQuery('');
+                    setEditingMission({
+                      mode: 'edit',
+                      original: mission,
+                      title: mission.title,
+                      location: mission.location,
+                      startDate: mission.startDate,
+                      endDate: mission.endDate,
+                      personnelIds: [...mission.personnelIds],
+                      notes: mission.notes,
+                    });
+                  }}
+                  className="btl-btn btl-btn-secondary min-h-[36px] px-3 py-1 text-xs"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-[#E5C17B]" />
+                  <span>Editar missão</span>
+                </button>
 
                 <button
                   type="button"
                   onClick={() =>
                     setConfirmDelete({
-                      title: 'Remover folga oficial',
-                      description: `Remover o registro de folga de ${label} (${formatShortDatePt(leave.startDate)} – ${formatShortDatePt(leave.endDate)})?`,
+                      title: 'Excluir missão',
+                      description: `Remover "${mission.title}" (${formatShortDatePt(mission.startDate)} – ${formatShortDatePt(mission.endDate)})? A marcação M será removida da planilha sem afetar outros registros nas mesmas datas.`,
                       onConfirm: async () => {
-                        await deleteLeave(adminToken, leave, label);
+                        await deleteMission(adminToken, mission);
                         setFeedback({
                           type: 'success',
-                          text: `Folga de ${label} removida e planilha atualizada.`,
+                          text: `Missão "${mission.title}" excluída e planilha atualizada.`,
                         });
                       },
                     })
                   }
-                  className="btl-btn btl-btn-danger min-h-[34px] px-3 py-1 text-xs self-start sm:self-center"
+                  className="btl-btn btl-btn-danger min-h-[36px] px-3 py-1 text-xs"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remover</span>
+                  <span>Excluir</span>
                 </button>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 
@@ -609,116 +445,6 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
                   className="btl-btn btl-btn-primary text-sm px-5"
                 >
                   {editingMission.mode === 'create' ? 'Salvar missão' : 'Atualizar missão'}
-                </button>
-              </div>
-            </motion.form>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* REGISTER OFFICIAL LEAVE MODAL */}
-      <AnimatePresence>
-        {showLeaveModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
-            role="dialog"
-            aria-modal="true"
-          >
-            <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={SPRING_MODAL}
-              onSubmit={handleSaveLeave}
-              className="w-full max-w-md btl-modal overflow-hidden"
-            >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
-                  Registrar Folga Oficial
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowLeaveModal(false)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-[#C8D4CD]">Militar</label>
-                  <PersonnelAutocompleteInput
-                    value={leavePersonInput}
-                    onChange={(val) => {
-                      setLeavePersonInput(val);
-                      setLeavePerson(null);
-                    }}
-                    personnel={personnel}
-                    placeholder="Selecione ou cadastre o militar..."
-                    onSelectPerson={(p) => setLeavePerson(p)}
-                    onQuickCreate={async (raw) => {
-                      const created = await handleQuickCreatePerson(raw);
-                      if (created) setLeavePerson(created);
-                      return created;
-                    }}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-1 text-xs font-semibold text-[#C8D4CD]">
-                    <span>Data inicial</span>
-                    <input
-                      type="date"
-                      required
-                      value={leaveStart}
-                      onChange={(e) => setLeaveStart(e.target.value)}
-                      className="btl-input px-3 py-2 font-mono"
-                    />
-                  </label>
-                  <label className="space-y-1 text-xs font-semibold text-[#C8D4CD]">
-                    <span>Data final</span>
-                    <input
-                      type="date"
-                      required
-                      value={leaveEnd}
-                      onChange={(e) => setLeaveEnd(e.target.value)}
-                      className="btl-input px-3 py-2 font-mono"
-                    />
-                  </label>
-                </div>
-
-                <label className="block space-y-1 text-xs font-semibold text-[#C8D4CD]">
-                  <span>Motivo (opcional)</span>
-                  <input
-                    type="text"
-                    maxLength={BLUEPRINT_LIMITS.MAX_REASON_LEN}
-                    value={leaveReason}
-                    onChange={(e) => setLeaveReason(e.target.value)}
-                    placeholder="Ex: Folga pós-serviço / Dispensa"
-                    className="btl-input px-3 py-2 font-normal"
-                  />
-                </label>
-              </div>
-
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => setShowLeaveModal(false)}
-                  className="btl-btn btl-btn-secondary text-sm"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={Boolean(busyMessage)}
-                  className="btl-btn btl-btn-primary text-sm px-5"
-                >
-                  Registrar folga
                 </button>
               </div>
             </motion.form>

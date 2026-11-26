@@ -86,7 +86,7 @@ service cloud.firestore {
         'id', 'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'createdAt', 'updatedAt'
       ]) &&
       data.keys().hasOnly([
-        'id', 'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'scaleMode', 'createdAt', 'updatedAt'
+        'id', 'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'scaleMode', 'blockedPeriods', 'createdAt', 'updatedAt'
       ]) &&
       data.id == personId &&
       isValidId(data.id) &&
@@ -97,21 +97,27 @@ service cloud.firestore {
       data.normalizedKey is string && data.normalizedKey.size() >= 2 && data.normalizedKey.size() <= 140 &&
       data.active is bool &&
       (!('scaleMode' in data) || data.scaleMode in ['both', 'black_only', 'red_only', 'none']) &&
+      (!('blockedPeriods' in data) || (
+        data.blockedPeriods is list &&
+        data.blockedPeriods.size() <= 20 &&
+        (data.blockedPeriods.size() == 0 || data.blockedPeriods[0] is map)
+      )) &&
       data.createdAt is timestamp &&
       data.updatedAt is timestamp;
     }
 
     function isValidCalendarDay(data, dateId) {
       return data.keys().hasAll([
-        'date', 'isRedScale', 'holidayLabel', 'updatedAt'
+        'date', 'isRedScale', 'holidayLabel', 'active', 'updatedAt'
       ]) &&
       data.keys().hasOnly([
-        'date', 'isRedScale', 'holidayLabel', 'updatedAt'
+        'date', 'isRedScale', 'holidayLabel', 'active', 'updatedAt'
       ]) &&
       data.date == dateId &&
       isValidDateId(data.date) &&
       data.isRedScale is bool &&
       data.holidayLabel is string && data.holidayLabel.size() <= 60 &&
+      data.active == true &&
       data.updatedAt is timestamp;
     }
 
@@ -269,7 +275,7 @@ service cloud.firestore {
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time &&
         incoming().diff(existing()).affectedKeys().hasOnly([
-          'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'scaleMode', 'updatedAt'
+          'fullName', 'warName', 'rank', 'company', 'normalizedKey', 'active', 'scaleMode', 'blockedPeriods', 'updatedAt'
         ]);
 
       // Soft-deactivation only so historical duties and missions are never orphaned
@@ -277,8 +283,8 @@ service cloud.firestore {
     }
 
     match /calendar_days/{dateId} {
-      allow get: if isValidDateId(dateId);
-      allow list: if isValidDateId(existing().date);
+      allow get: if isValidDateId(dateId) && (resource == null || existing().active == true || isAdmin());
+      allow list: if existing().active == true || isAdmin();
 
       allow create: if isAdmin() &&
         isValidDateId(dateId) &&
@@ -291,7 +297,7 @@ service cloud.firestore {
         incoming().date == existing().date &&
         incoming().updatedAt == request.time &&
         incoming().diff(existing()).affectedKeys().hasOnly([
-          'isRedScale', 'holidayLabel', 'updatedAt'
+          'isRedScale', 'holidayLabel', 'active', 'updatedAt'
         ]);
 
       allow delete: if isAdmin() && isValidDateId(dateId);

@@ -10,7 +10,6 @@ import {
 } from '../lib/matrixEngine';
 import type {
   CalendarDayOverride,
-  LeaveRecord,
   MissionRecord,
   PersonnelProfile,
   RestOrderCandidate,
@@ -22,7 +21,6 @@ export interface RestOrderContext {
   isRedScale: boolean;
   entriesBySchedule: Record<string, ScheduleEntry[]>;
   missions: MissionRecord[];
-  leaves: LeaveRecord[];
   calendarDays?: Record<string, CalendarDayOverride>;
   defaultRankFilter?: string;
 }
@@ -103,7 +101,6 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
       personnel: availablePool,
       entriesBySchedule: restOrderContext.entriesBySchedule,
       missions: restOrderContext.missions,
-      leaves: restOrderContext.leaves,
       calendarDays: restOrderContext.calendarDays,
       targetDate: restOrderContext.targetDate,
       isRedScale: restOrderContext.isRedScale,
@@ -410,7 +407,9 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                           ) : (
                             <div>
                               <div className="font-mono text-[11px] font-bold text-[#A8D8BE] tabular-nums">
-                                {cand.daysSinceLastDuty}d folga
+                                {cand.daysSinceLastDuty === 0
+                                  ? '0d (Dobra)'
+                                  : `${cand.daysSinceLastDuty}×1 (${cand.daysSinceLastDuty}d)`}
                               </div>
                               {cand.lastDutyDate && (
                                 <div className="font-mono text-[9px] text-[#7D8F85] tabular-nums">
