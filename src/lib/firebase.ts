@@ -1,5 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import {
+  getAuth,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+  type User,
+} from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -8,8 +14,63 @@ const app = initializeApp(firebaseConfig);
 export const firebaseProjectId = firebaseConfig.projectId;
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+export const GOOGLE_WORKSPACE_SCOPES = [
+  'https://www.googleapis.com/auth/spreadsheets',
+] as const;
+
 export const googleProvider = new GoogleAuthProvider();
+for (const scope of GOOGLE_WORKSPACE_SCOPES) {
+  googleProvider.addScope(scope);
+}
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// Strictly in-memory OAuth access token cache (never stored in localStorage/sessionStorage)
+let cachedGoogleAccessToken: string | null = null;
+const tokenListeners = new Set<(token: string | null) => void>();
+
+function notifyTokenListeners() {
+  for (const listener of tokenListeners) {
+    listener(cachedGoogleAccessToken);
+  }
+}
+
+export function setGoogleAccessToken(token: string | null): void {
+  cachedGoogleAccessToken = token;
+  notifyTokenListeners();
+}
+
+export function getGoogleAccessToken(): string | null {
+  return cachedGoogleAccessToken;
+}
+
+export function subscribeGoogleAccessToken(
+  listener: (token: string | null) => void
+): () => void {
+  tokenListeners.add(listener);
+  listener(cachedGoogleAccessToken);
+  return () => {
+    tokenListeners.delete(listener);
+  };
+}
+
+onAuthStateChanged(auth, (user: User | null) => {
+  if (!user && cachedGoogleAccessToken !== null) {
+    cachedGoogleAccessToken = null;
+    notifyTokenListeners();
+  }
+});
+
+/** Triggers Google Sign-In popup to obtain a fresh Google Sheets access token in memory */
+export async function connectGoogleSheetsPopup(): Promise<{ user: User; accessToken: string }> {
+  const result = await signInWithPopup(auth, googleProvider);
+  const credential = GoogleAuthProvider.credentialFromResult(result);
+  if (!credential?.accessToken) {
+    throw new Error('Não foi possível obter autorização do Google Sheets.');
+  }
+  setGoogleAccessToken(credential.accessToken);
+  return { user: result.user, accessToken: credential.accessToken };
+}
 
 export enum OperationType {
   CREATE = 'create',

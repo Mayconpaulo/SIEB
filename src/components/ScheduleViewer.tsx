@@ -11,6 +11,11 @@ import {
 import { formatFullDatePt, formatShortDatePt } from '../data/initialSchedules';
 import { SPRING_TAB, TRANSITION_VIEW, VIEW_VARIANTS } from '../lib/motion';
 import type { ScheduleEntry, ScheduleModel } from '../types/schedule';
+import {
+  DutyAssignmentBadge,
+  DutySwapDetailModal,
+  type SwapDetailTarget,
+} from './DutySwapDetailModal';
 
 interface ScheduleViewerProps {
   schedules: ScheduleModel[];
@@ -31,34 +36,6 @@ function normalizeText(value: string): string {
     .toLowerCase();
 }
 
-function renderAssignmentValue(raw: string, highlightTerm: string): React.ReactNode {
-  const trimmed = raw.trim();
-  if (!trimmed) {
-    return <span className="text-[#4F6056] select-none">—</span>;
-  }
-
-  // Detect substitution notation like "BENACE (LUIS CLAUDIO)" or "* ALBUQUERQUE (MALTA - GUEs)"
-  const parenMatch = trimmed.match(/^([^(]+?)\s*(\(.+\))$/);
-  const isMatch = highlightTerm.length > 0 && normalizeText(trimmed).includes(highlightTerm);
-
-  const highlightClass = isMatch
-    ? 'bg-[#C8A461]/30 text-[#F4E6C4] ring-1 ring-[#E5C17B]/40 px-1.5 py-0.5 -mx-1 rounded'
-    : '';
-
-  if (parenMatch) {
-    const mainName = parenMatch[1].trim();
-    const subNote = parenMatch[2].trim();
-    return (
-      <span className={`inline-flex flex-wrap items-baseline gap-x-1.5 ${highlightClass}`}>
-        <span className="font-semibold text-[#E4EAE6]">{mainName}</span>
-        <span className="text-xs font-medium text-[#98A89F]">{subNote}</span>
-      </span>
-    );
-  }
-
-  return <span className={`font-semibold text-[#E4EAE6] ${highlightClass}`}>{trimmed}</span>;
-}
-
 export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
   schedules,
   selectedScheduleId,
@@ -74,6 +51,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [onlyAssignedInDaily, setOnlyAssignedInDaily] = useState(false);
+  const [swapDetail, setSwapDetail] = useState<SwapDetailTarget | null>(null);
 
   const todayRowRef = useRef<HTMLTableRowElement | null>(null);
   const selectedSchedule =
@@ -440,10 +418,19 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                               key={col.id}
                               className="px-4 py-2.5 border-r last:border-r-0 border-[#EBE0C8]/8 align-middle whitespace-nowrap text-[13px] sm:text-sm"
                             >
-                              {renderAssignmentValue(
-                                entry.assignments[col.id] ?? '',
-                                normalizedQuery
-                              )}
+                              <DutyAssignmentBadge
+                                rawValue={entry.assignments[col.id] ?? ''}
+                                highlightTerm={normalizedQuery}
+                                onInspectSwap={(scheduledLabel, substituteLabel) =>
+                                  setSwapDetail({
+                                    scheduleName: selectedSchedule.name,
+                                    columnLabel: col.label,
+                                    date: entry.date,
+                                    scheduledLabel,
+                                    substituteLabel,
+                                  })
+                                }
+                              />
                             </td>
                           ))}
                         </tr>
@@ -608,11 +595,22 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                                 {col.label}
                               </div>
                               <div className="text-base sm:text-right">
-                                {value ? (
-                                  renderAssignmentValue(value, normalizedQuery)
-                                ) : (
-                                  <span className="text-sm text-[#697870]">Sem escalação</span>
-                                )}
+                                <DutyAssignmentBadge
+                                  rawValue={value}
+                                  highlightTerm={normalizedQuery}
+                                  emptyFallback={
+                                    <span className="text-sm text-[#697870]">Sem escalação</span>
+                                  }
+                                  onInspectSwap={(scheduledLabel, substituteLabel) =>
+                                    setSwapDetail({
+                                      scheduleName: selectedSchedule.name,
+                                      columnLabel: col.label,
+                                      date: activeDailyEntry.date,
+                                      scheduledLabel,
+                                      substituteLabel,
+                                    })
+                                  }
+                                />
                               </div>
                             </div>
                           );
@@ -632,6 +630,8 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
           )}
         </AnimatePresence>
       )}
+
+      <DutySwapDetailModal detail={swapDetail} onClose={() => setSwapDetail(null)} />
     </div>
   );
 };

@@ -39,7 +39,7 @@ const RANK_PATTERNS: { regex: RegExp; canonical: string }[] = [
   { regex: /^(?:1[º°o]?\s*(?:TENENTE|TEN\.?))\b\.?\s*/i, canonical: '1º Ten' },
   { regex: /^(?:2[º°o]?\s*(?:TENENTE|TEN\.?))\b\.?\s*/i, canonical: '2º Ten' },
   { regex: /^(?:ASPIRANTE(?:\s+A\s+OFICIAL)?|ASP(?:\s+OF)?\.?)\b\.?\s*/i, canonical: 'Asp Of' },
-  { regex: /^(?:SUBTENENTE|SUB[\s-]*TEN\.?|ST)\b\.?\s*/i, canonical: 'Subten' },
+  { regex: /^(?:SUBTENENTE|SUB[\s-]*TEN\.?|S[\s.]*TEN\.?|ST)\b\.?\s*/i, canonical: 'Subten' },
   { regex: /^(?:1[º°o]?\s*(?:SARGENTO|SGT\.?))\b\.?\s*/i, canonical: '1º Sgt' },
   { regex: /^(?:2[º°o]?\s*(?:SARGENTO|SGT\.?))\b\.?\s*/i, canonical: '2º Sgt' },
   { regex: /^(?:3[º°o]?\s*(?:SARGENTO|SGT\.?))\b\.?\s*/i, canonical: '3º Sgt' },
@@ -110,43 +110,143 @@ export function parseMilitaryInput(rawInput: string): {
   };
 }
 
+export interface ParsedDutyCell {
+  raw: string;
+  isSwap: boolean;
+  /** Militar originalmente escalado (em cuja escala e folga o serviço CONTA) */
+  scheduledLabel: string;
+  /** Militar que assumiu no lugar em troca (NÃO conta na escala/folga deste militar) */
+  substituteLabel: string | null;
+  scheduledPerson: ReturnType<typeof parseMilitaryInput>;
+  substitutePerson: ReturnType<typeof parseMilitaryInput>;
+}
+
 /**
- * Extracts one or more soldier mentions from a schedule cell.
- * Handles substitution notation such as "BENACE (LUIS CLAUDIO)" -> extracts both titular and substitute,
- * ignoring short non-name unit tags like "(GUES)" when hyphenated like "(MALTA - GUEs)".
+ * Encodes a duty assignment with optional swap (troca de serviço).
+ * Canonical format: "3º Sgt PAULO SILVA [TROCA: 3º Sgt DA FONTE FONSECA]"
  */
-export function extractMilitaryMentionsFromCell(rawCell: string): {
-  effective: ReturnType<typeof parseMilitaryInput>;
-  allMentions: NonNullable<ReturnType<typeof parseMilitaryInput>>[];
-} {
+export function formatDutyCell(scheduledLabel: string, substituteLabel?: string | null): string {
+  const sched = scheduledLabel.trim();
+  const sub = (substituteLabel ?? '').trim();
+  if (!sched) return '';
+  if (!sub || normalizeMilitaryText(sub) === normalizeMilitaryText(sched)) {
+    return sched;
+  }
+  return `${sched} [TROCA: ${sub}]`;
+}
+
+/**
+ * Parses a schedule cell value into scheduled soldier + optional substitute (troca).
+ * Supports:
+ * - "3º Sgt PAULO SILVA [TROCA: 3º Sgt DA FONTE FONSECA]"
+ * - "3º Sgt PAULO SILVA ⇄ 3º Sgt DA FONTE FONSECA"
+ * - Legacy "TITULAR (SUBSTITUTO)"
+ */
+export function parseDutyCell(rawCell: string): ParsedDutyCell {
   const trimmed = rawCell.trim();
   if (!trimmed || trimmed === '—' || trimmed === '-') {
-    return { effective: null, allMentions: [] };
+    return {
+      raw: trimmed,
+      isSwap: false,
+      scheduledLabel: '',
+      substituteLabel: null,
+      scheduledPerson: null,
+      substitutePerson: null,
+    };
   }
 
+  // Canonical bracket format: "SCHEDULED [TROCA: SUBSTITUTE]"
+  const trocaMatch = trimmed.match(/^(.+?)\s*\[TROCA:\s*([^\]]+)\]$/i);
+  if (trocaMatch) {
+    const scheduledLabel = trocaMatch[1].trim();
+    const substituteLabel = trocaMatch[2].trim();
+    return {
+      raw: trimmed,
+      isSwap: Boolean(substituteLabel),
+      scheduledLabel,
+      substituteLabel: substituteLabel || null,
+      scheduledPerson: parseMilitaryInput(scheduledLabel),
+      substitutePerson: parseMilitaryInput(substituteLabel),
+    };
+  }
+
+  // Arrow shorthand: "SCHEDULED ⇄ SUBSTITUTE"
+  const arrowMatch = trimmed.match(/^(.+?)\s*⇄\s*(.+)$/);
+  if (arrowMatch) {
+    const scheduledLabel = arrowMatch[1].trim();
+    const substituteLabel = arrowMatch[2].trim();
+    return {
+      raw: trimmed,
+      isSwap: Boolean(substituteLabel),
+      scheduledLabel,
+      substituteLabel: substituteLabel || null,
+      scheduledPerson: parseMilitaryInput(scheduledLabel),
+      substitutePerson: parseMilitaryInput(substituteLabel),
+    };
+  }
+
+  // Legacy parentheses notation: "TITULAR (SUBSTITUTO)"
   const parenMatch = trimmed.match(/^([^(]+?)\s*\(([^)]+)\)$/);
   if (parenMatch) {
-    const mainParsed = parseMilitaryInput(parenMatch[1]);
-    // Strip trailing unit tag inside parentheses e.g. "MALTA - GUEs" -> "MALTA"
+    const scheduledLabel = parenMatch[1].trim();
     const subClean = parenMatch[2].split(/\s+[-–]\s+/)[0].trim();
-    const subParsed = parseMilitaryInput(subClean);
-    const mentions: NonNullable<ReturnType<typeof parseMilitaryInput>>[] = [];
-    if (mainParsed) mentions.push(mainParsed);
-    if (subParsed && subParsed.normalizedKey !== mainParsed?.normalizedKey) {
-      mentions.push(subParsed);
-    }
-    // In military duty rosters, the person in parentheses is the actual substitute if present,
-    // while both are auto-registered in the personnel database.
+    const scheduledPerson = parseMilitaryInput(scheduledLabel);
+    const substitutePerson = parseMilitaryInput(subClean);
+    const isRealSub =
+      Boolean(substitutePerson) &&
+      substitutePerson?.normalizedKey !== scheduledPerson?.normalizedKey;
     return {
-      effective: subParsed ?? mainParsed,
-      allMentions: mentions,
+      raw: trimmed,
+      isSwap: isRealSub,
+      scheduledLabel,
+      substituteLabel: isRealSub ? subClean : null,
+      scheduledPerson,
+      substitutePerson: isRealSub ? substitutePerson : null,
     };
   }
 
   const single = parseMilitaryInput(trimmed);
   return {
-    effective: single,
-    allMentions: single ? [single] : [],
+    raw: trimmed,
+    isSwap: false,
+    scheduledLabel: trimmed,
+    substituteLabel: null,
+    scheduledPerson: single,
+    substitutePerson: null,
+  };
+}
+
+/**
+ * Extracts soldier mentions from a schedule cell.
+ * IMPORTANT: When a duty swap occurs (e.g. Paulo Silva swapped with Da Fonte Fonseca),
+ * `effective` ALWAYS resolves to the SCHEDULED soldier (Paulo Silva) so the duty counts
+ * on Paulo Silva's scale/folga — NOT on the substitute's scale.
+ * Both soldiers are returned in `allMentions` so auto-registration preserves both profiles.
+ */
+export function extractMilitaryMentionsFromCell(rawCell: string): {
+  effective: ReturnType<typeof parseMilitaryInput>;
+  substitute: ReturnType<typeof parseMilitaryInput>;
+  isSwap: boolean;
+  scheduledLabel: string;
+  substituteLabel: string | null;
+  allMentions: NonNullable<ReturnType<typeof parseMilitaryInput>>[];
+} {
+  const parsed = parseDutyCell(rawCell);
+  const mentions: NonNullable<ReturnType<typeof parseMilitaryInput>>[] = [];
+  if (parsed.scheduledPerson) mentions.push(parsed.scheduledPerson);
+  if (
+    parsed.substitutePerson &&
+    parsed.substitutePerson.normalizedKey !== parsed.scheduledPerson?.normalizedKey
+  ) {
+    mentions.push(parsed.substitutePerson);
+  }
+  return {
+    effective: parsed.scheduledPerson,
+    substitute: parsed.substitutePerson,
+    isSwap: parsed.isSwap,
+    scheduledLabel: parsed.scheduledLabel,
+    substituteLabel: parsed.substituteLabel,
+    allMentions: mentions,
   };
 }
 
@@ -866,10 +966,10 @@ export function buildDynamicMatrix(params: {
       const code: 'P' | 'V' = effectiveIsRed ? 'V' : 'P';
 
       for (const [colId, rawVal] of Object.entries(entry.assignments)) {
-        const { effective } = extractMilitaryMentionsFromCell(String(rawVal ?? ''));
-        if (!effective) continue;
+        const mention = extractMilitaryMentionsFromCell(String(rawVal ?? ''));
+        if (!mention.effective) continue;
 
-        const matched = findMatchingPersonnel(effective, personnel);
+        const matched = findMatchingPersonnel(mention.effective, personnel);
         if (!matched) continue;
 
         if (isBeforeRange) {
@@ -898,6 +998,13 @@ export function buildDynamicMatrix(params: {
             detail: colLabel,
             shortLabel: abbreviateDutyLabel(colLabel),
             scheduleId: schedule.id,
+            ...(mention.isSwap
+              ? {
+                  isSwap: true,
+                  scheduledLabel: mention.scheduledLabel,
+                  substituteLabel: mention.substituteLabel ?? undefined,
+                }
+              : {}),
           });
         }
       }

@@ -2,8 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { ArrowUpRight, Search, X } from 'lucide-react';
 import { formatFullDatePt } from '../data/initialSchedules';
+import { parseDutyCell } from '../lib/matrixEngine';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '../lib/motion';
 import type { ScheduleEntry, ScheduleModel } from '../types/schedule';
+import {
+  DutyAssignmentBadge,
+  DutySwapDetailModal,
+  type SwapDetailTarget,
+} from './DutySwapDetailModal';
 
 interface SoldierSearchViewProps {
   schedules: ScheduleModel[];
@@ -41,6 +47,7 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
   const [queryText, setQueryText] = useState(initialQuery);
   const [scheduleFilter, setScheduleFilter] = useState<string>('all');
   const [onlyUpcoming, setOnlyUpcoming] = useState(false);
+  const [swapDetail, setSwapDetail] = useState<SwapDetailTarget | null>(null);
 
   const normalized = normalizeText(queryText.trim());
 
@@ -82,10 +89,8 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
     for (const s of schedules) {
       for (const entry of entriesBySchedule[s.id] ?? []) {
         for (const val of Object.values(entry.assignments)) {
-          const clean = String(val ?? '')
-            .replace(/^\*\s*/, '')
-            .replace(/\s*\(.+\)$/, '')
-            .trim();
+          const parsed = parseDutyCell(String(val ?? ''));
+          const clean = parsed.scheduledLabel.replace(/^\*\s*/, '').trim();
           if (clean.length >= 3) {
             counts.set(clean, (counts.get(clean) ?? 0) + 1);
           }
@@ -238,12 +243,24 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
                         <span className="text-[#98A89F]">{m.scheduleName}</span>
                       </div>
 
-                      <div className="flex flex-wrap items-baseline gap-x-2">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-xs font-medium text-[#98A89F]">
                           {m.columnLabel}:
                         </span>
                         <span className="text-sm font-semibold text-[#E4EAE6]">
-                          {m.rawValue}
+                          <DutyAssignmentBadge
+                            rawValue={m.rawValue}
+                            highlightTerm={normalized}
+                            onInspectSwap={(scheduledLabel, substituteLabel) =>
+                              setSwapDetail({
+                                scheduleName: m.scheduleName,
+                                columnLabel: m.columnLabel,
+                                date: m.date,
+                                scheduledLabel,
+                                substituteLabel,
+                              })
+                            }
+                          />
                         </span>
                       </div>
                     </div>
@@ -263,6 +280,8 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
           )}
         </div>
       )}
+
+      <DutySwapDetailModal detail={swapDetail} onClose={() => setSwapDetail(null)} />
     </div>
   );
 };

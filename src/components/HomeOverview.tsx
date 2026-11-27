@@ -4,6 +4,11 @@ import { ArrowRight, CalendarDays, Search, Table2 } from 'lucide-react';
 import { formatFullDatePt, formatShortDatePt } from '../data/initialSchedules';
 import { STAGGER_CONTAINER, STAGGER_ITEM } from '../lib/motion';
 import type { ScheduleEntry, ScheduleModel } from '../types/schedule';
+import {
+  DutyAssignmentBadge,
+  DutySwapDetailModal,
+  type SwapDetailTarget,
+} from './DutySwapDetailModal';
 import { PWAInstallButton } from './PWAInstallButton';
 
 interface HomeOverviewProps {
@@ -24,6 +29,7 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
   onOpenSearch,
 }) => {
   const [quickQuery, setQuickQuery] = React.useState('');
+  const [swapDetail, setSwapDetail] = React.useState<SwapDetailTarget | null>(null);
 
   const handleQuickSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +202,19 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
                               {col.label}
                             </dt>
                             <dd className="text-sm font-semibold text-[#E4EAE6] sm:text-right">
-                              {value}
+                              <DutyAssignmentBadge
+                                rawValue={value}
+                                onInspectSwap={(scheduledLabel, substituteLabel) =>
+                                  entry &&
+                                  setSwapDetail({
+                                    scheduleName: schedule.name,
+                                    columnLabel: col.label,
+                                    date: entry.date,
+                                    scheduledLabel,
+                                    substituteLabel,
+                                  })
+                                }
+                              />
                             </dd>
                           </div>
                         ))}
@@ -300,6 +318,8 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
           })}
         </motion.div>
       </section>
+
+      <DutySwapDetailModal detail={swapDetail} onClose={() => setSwapDetail(null)} />
     </div>
   );
 };

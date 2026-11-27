@@ -85,11 +85,17 @@ function mergeWithBattalionBase(
 }
 
 export function countPendingBattalionSync(personnel: PersonnelProfile[]): number {
-  const existingIds = new Set(personnel.filter((p) => Boolean(p.createdAt)).map((p) => p.id));
   const cloudOnly = personnel.filter((p) => Boolean(p.createdAt));
+  const cloudById = new Map(cloudOnly.map((p) => [p.id, p]));
   let missing = 0;
   for (const basePerson of BATTALION_PERSONNEL) {
-    if (existingIds.has(basePerson.id)) continue;
+    const byId = cloudById.get(basePerson.id);
+    if (byId) {
+      if (byId.warName !== basePerson.warName || byId.fullName !== basePerson.fullName) {
+        missing += 1;
+      }
+      continue;
+    }
     const matched = findMatchingPersonnel(
       { fullName: basePerson.fullName, warName: basePerson.warName, rank: basePerson.rank },
       cloudOnly
@@ -97,8 +103,9 @@ export function countPendingBattalionSync(personnel: PersonnelProfile[]): number
     if (!matched) {
       missing += 1;
     } else if (
-      basePerson.fullName.length > matched.fullName.length &&
-      basePerson.fullName !== matched.fullName
+      (basePerson.fullName.length > matched.fullName.length &&
+        basePerson.fullName !== matched.fullName) ||
+      basePerson.warName !== matched.warName
     ) {
       missing += 1;
     }
@@ -109,7 +116,7 @@ export function countPendingBattalionSync(personnel: PersonnelProfile[]): number
 /**
  * Idempotently persists the complete battalion roster into Firestore `personnel` collection:
  * - Creates any missing battalion soldiers using deterministic IDs (`efv_...`) in safe batches of 350.
- * - Enriches previously auto-registered profiles (fullName/rank/warName) in place without duplicating or losing history.
+ * - Enriches/updates previously synced profiles (fullName/rank/warName) in place without duplicating or losing history.
  */
 export async function syncBattalionPersonnelToFirestore(
   adminToken: string,
@@ -128,8 +135,16 @@ export async function syncBattalionPersonnelToFirestore(
   const usedCloudIds = new Set<string>();
 
   for (const base of BATTALION_PERSONNEL) {
-    if (cloudById.has(base.id)) {
+    const existingById = cloudById.get(base.id);
+    if (existingById) {
       usedCloudIds.add(base.id);
+      if (
+        existingById.warName !== base.warName ||
+        existingById.fullName !== base.fullName ||
+        existingById.normalizedKey !== base.normalizedKey
+      ) {
+        ops.push({ kind: 'update', existing: existingById, base });
+      }
       continue;
     }
 
@@ -143,6 +158,7 @@ export async function syncBattalionPersonnelToFirestore(
       usedCloudIds.add(matched.id);
       const needsEnrich =
         (base.fullName.length > matched.fullName.length && base.fullName !== matched.fullName) ||
+        base.warName !== matched.warName ||
         (!matched.rank && Boolean(base.rank));
       if (needsEnrich) {
         ops.push({ kind: 'update', existing: matched, base });
@@ -183,16 +199,25 @@ export async function syncBattalionPersonnelToFirestore(
           created += 1;
         } else {
           const { existing, base } = op;
-          const nextFullName = (
-            base.fullName.length > existing.fullName.length ? base.fullName : existing.fullName
-          ).slice(0, BLUEPRINT_LIMITS.MAX_NAME_LEN);
+          const nextFullName = (base.fullName || existing.fullName).slice(
+            0,
+            BLUEPRINT_LIMITS.MAX_NAME_LEN
+          );
+          const nextWarName = (base.warName || existing.warName).slice(
+            0,
+            BLUEPRINT_LIMITS.MAX_WAR_NAME_LEN
+          );
           const nextRank = (existing.rank || base.rank).slice(0, BLUEPRINT_LIMITS.MAX_RANK_LEN);
+          const nextKey = buildNormalizedKey(nextWarName, nextFullName).slice(
+            0,
+            BLUEPRINT_LIMITS.MAX_NORMALIZED_KEY_LEN
+          );
           batch.update(doc(db, 'personnel', existing.id), {
             fullName: nextFullName,
-            warName: existing.warName,
+            warName: nextWarName,
             rank: nextRank,
             company: existing.company,
-            normalizedKey: existing.normalizedKey,
+            normalizedKey: nextKey,
             updatedAt: serverTimestamp(),
           });
           updated += 1;

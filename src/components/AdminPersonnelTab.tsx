@@ -14,6 +14,15 @@ import {
 import * as XLSX from 'xlsx';
 import { getRestoredSlice, registerSnapshotProvider } from '../lib/autoUpdate';
 import {
+  connectGoogleSheetsPopup,
+  getGoogleAccessToken,
+  setGoogleAccessToken,
+} from '../lib/firebase';
+import {
+  fetchOfficialRosterFromGoogleSheets,
+  GoogleSheetsAuthError,
+} from '../lib/googleSheetsService';
+import {
   buildImportMergePlan,
   formatPersonnelDisplay,
   normalizeMilitaryText,
@@ -230,6 +239,49 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
     }
   };
 
+  const handleLoadFromGoogleSheetsRoster = async () => {
+    setFeedback(null);
+    setBusyMessage('Lendo relação oficial do efetivo no Google Sheets...');
+    try {
+      let token = getGoogleAccessToken();
+      if (!token) {
+        const res = await connectGoogleSheetsPopup();
+        token = res.accessToken;
+      }
+      if (!token) {
+        setFeedback({
+          type: 'error',
+          text: 'Não foi possível obter permissão do Google Sheets. Tente novamente.',
+        });
+        return;
+      }
+      const { sheetTitle, candidates } = await fetchOfficialRosterFromGoogleSheets(token);
+      if (candidates.length === 0) {
+        setFeedback({
+          type: 'error',
+          text: 'Nenhum militar encontrado na aba Ctr Efetivo da planilha Google.',
+        });
+        return;
+      }
+      const plan = buildImportMergePlan(candidates, personnel);
+      setImportFileName(`Google Sheets — ${sheetTitle}`);
+      setImportPlan(plan);
+      setShowImportModal(true);
+    } catch (err) {
+      if (err instanceof GoogleSheetsAuthError) {
+        setGoogleAccessToken(null);
+        setFeedback({
+          type: 'error',
+          text: 'Permissão do Google Sheets expirada ou não autorizada. Clique novamente para reconectar.',
+        });
+      } else {
+        onActionError(err);
+      }
+    } finally {
+      setBusyMessage('');
+    }
+  };
+
   const filtered = useMemo(() => {
     const parsedQuery = parseProgressiveSearchQuery(search);
     const rawNorm = normalizeMilitaryText(search);
@@ -427,6 +479,15 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
               <span>Sincronizar efetivo ({pendingSyncCount})</span>
             </button>
           )}
+          <button
+            type="button"
+            disabled={Boolean(busyMessage)}
+            onClick={() => void handleLoadFromGoogleSheetsRoster()}
+            className="btl-btn btl-btn-secondary text-xs sm:text-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-[#A8D8BE]" />
+            <span>Planilha Google</span>
+          </button>
           <button
             type="button"
             onClick={() => {

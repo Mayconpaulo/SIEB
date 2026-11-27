@@ -3,16 +3,20 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
   ArrowDown,
+  ArrowLeftRight,
   ArrowUp,
   Briefcase,
   CalendarPlus,
   Check,
   CloudUpload,
+  ExternalLink,
   Eye,
+  FileSpreadsheet,
   History,
   Layers,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   Table2,
   TableProperties,
@@ -36,8 +40,21 @@ import {
   saveWorkingDraft,
 } from '../lib/autoUpdate';
 import {
+  connectGoogleSheetsPopup,
+  setGoogleAccessToken,
+  subscribeGoogleAccessToken,
+} from '../lib/firebase';
+import {
+  BACKUP_MIRROR_SHEET_TITLE,
+  BACKUP_SPREADSHEET_URL,
+  GoogleSheetsAuthError,
+  syncScheduleChangesToGoogleSheets,
+} from '../lib/googleSheetsService';
+import {
+  formatDutyCell,
   formatPersonnelDisplay,
   inferRankFilterFromScheduleContext,
+  parseDutyCell,
   parseMilitaryInput,
 } from '../lib/matrixEngine';
 import {
@@ -117,6 +134,36 @@ const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ComponentType<{ cla
   { id: 'history', label: 'Histórico', icon: History },
 ];
 
+const GoogleMiniIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4 shrink-0' }) => (
+  <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+    <path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </svg>
+);
+
+function formatDiffDisplayValue(raw: string): string {
+  const parsed = parseDutyCell(raw);
+  if (!parsed.raw || raw === '—') return '—';
+  if (parsed.isSwap && parsed.substituteLabel) {
+    return `${parsed.substituteLabel} (Troca · Escalado: ${parsed.scheduledLabel})`;
+  }
+  return parsed.scheduledLabel;
+}
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   adminToken,
   isCloudSynced,
@@ -177,13 +224,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [renamingEntry, setRenamingEntry] = useState<ScheduleEntry | null>(null);
   const [newDateValue, setNewDateValue] = useState('');
 
-  // Confirmation modal (delete entry or delete schedule)
+  // Confirmation modal (delete entry, delete schedule, or Google Sheets full sync)
   const [confirmAction, setConfirmAction] = useState<{
     title: string;
     description: string;
     confirmLabel: string;
+    variant?: 'danger' | 'primary';
+    busyLabel?: string;
     onConfirm: () => Promise<void>;
   } | null>(null);
+
+  // Google Sheets live-backup OAuth state (strictly in-memory)
+  const [googleAccessToken, setGoogleTokenState] = useState<string | null>(null);
+  const [connectingGoogleSheets, setConnectingGoogleSheets] = useState(false);
+  const [syncGoogleSheetsOnSave, setSyncGoogleSheetsOnSave] = useState(true);
+
+  // Duty Swap / Substitution editor modal
+  const [editingSwapCell, setEditingSwapCell] = useState<{
+    date: string;
+    colId: string;
+    colLabel: string;
+    isRedScale: boolean;
+    scheduledValue: string;
+    hasSwap: boolean;
+    substituteValue: string;
+  } | null>(null);
+
+  useEffect(() => subscribeGoogleAccessToken(setGoogleTokenState), []);
 
   // Model editor modal (create new schedule or edit existing schedule & columns)
   const [editingModel, setEditingModel] = useState<{
@@ -596,6 +663,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const handleConnectGoogleSheets = async () => {
+    if (connectingGoogleSheets) return;
+    setConnectingGoogleSheets(true);
+    setFeedback(null);
+    try {
+      const token = await connectGoogleSheetsPopup();
+      if (token) {
+        setFeedback({
+          type: 'success',
+          text: 'Google Sheets conectado. As alterações publicadas nas escalas serão espelhadas na planilha vinculada.',
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          text: 'Não foi possível obter a permissão do Google Sheets. Tente novamente.',
+        });
+      }
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/popup-closed-by-user') {
+        setFeedback({
+          type: 'error',
+          text: 'Autorização do Google Sheets cancelada.',
+        });
+      } else if (code === 'auth/popup-blocked') {
+        setFeedback({
+          type: 'error',
+          text: 'O navegador bloqueou o pop-up do Google. Permita pop-ups para este site e tente novamente.',
+        });
+      } else {
+        handleActionError(err);
+      }
+    } finally {
+      setConnectingGoogleSheets(false);
+    }
+  };
+
+  const handleRequestFullGoogleSheetsSync = () => {
+    if (!googleAccessToken) {
+      void handleConnectGoogleSheets();
+      return;
+    }
+    setConfirmAction({
+      title: 'Sincronizar todas as escalas com o Google Sheets',
+      description:
+        'Esta ação atualizará as abas de folga (Maj, Cap, Ten, Adj, 3º Sgt, Cb) e a aba de backup completo "Escalas SIEB" na planilha Google vinculada com os dados atuais do sistema.',
+      confirmLabel: 'Confirmar sincronização',
+      variant: 'primary',
+      busyLabel: 'Sincronizando todas as escalas com o Google Sheets...',
+      onConfirm: async () => {
+        try {
+          const result = await syncScheduleChangesToGoogleSheets(googleAccessToken, {
+            schedules,
+            entriesBySchedule: liveEntriesBySchedule,
+            personnel,
+          });
+          setFeedback({
+            type: 'success',
+            text: `Google Sheets atualizado: ${result.updatedFolgaCells} célula(s) de folga gravadas e ${result.backupRowsWritten} registro(s) na aba "${BACKUP_MIRROR_SHEET_TITLE}".${
+              result.unmatchedCount > 0
+                ? ` (${result.unmatchedCount} militar(es) sem linha correspondente nas abas de folga foram mantidos na aba ${BACKUP_MIRROR_SHEET_TITLE}.)`
+                : ''
+            }`,
+          });
+        } catch (err) {
+          if (err instanceof GoogleSheetsAuthError) {
+            setGoogleAccessToken(null);
+            setFeedback({
+              type: 'error',
+              text: 'Permissão do Google Sheets expirada. Clique em "Conectar Google Sheets" para reconectar.',
+            });
+            return;
+          }
+          throw err;
+        }
+      },
+    });
+  };
+
   const handleCommitDraftChanges = async () => {
     if (!selectedSchedule || modifiedDatesSet.size === 0) return;
     if (!isCloudSynced) {
@@ -611,11 +757,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setBusyMessage('Salvando alterações e sincronizando efetivo...');
     try {
       const changedEntries = draftEntries.filter((e) => modifiedDatesSet.has(e.date));
+      const savedByDate = new Map(savedEntries.map((e) => [e.date, e]));
+      const removedCellValuesByDate = new Map<string, string[]>();
       const allCellValues: string[] = [];
+
       for (const entry of changedEntries) {
+        const orig = savedByDate.get(entry.date);
         for (const col of selectedSchedule.columns) {
           const val = (entry.assignments[col.id] ?? '').trim();
           if (val) allCellValues.push(val);
+
+          const prevVal = (orig?.assignments[col.id] ?? '').trim();
+          if (prevVal && prevVal !== val) {
+            const list = removedCellValuesByDate.get(entry.date) ?? [];
+            list.push(prevVal);
+            removedCellValuesByDate.set(entry.date, list);
+          }
         }
       }
 
@@ -628,7 +785,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const summary = `${pendingDiffs.length} alteração(ões) em ${changedEntries.length} data(s)`;
       const details = pendingDiffs
         .slice(0, 8)
-        .map((d) => `${formatShortDatePt(d.date)} [${d.fieldLabel}]: ${d.before} → ${d.after}`)
+        .map(
+          (d) =>
+            `${formatShortDatePt(d.date)} [${d.fieldLabel}]: ${formatDiffDisplayValue(
+              d.before
+            )} → ${formatDiffDisplayValue(d.after)}`
+        )
         .join(' | ');
 
       await saveEntriesBatch(
@@ -643,13 +805,43 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (draftStorageKey) {
         clearWorkingDraft(draftStorageKey);
       }
+
+      let sheetsStatusNote = '';
+      if (syncGoogleSheetsOnSave && googleAccessToken) {
+        setBusyMessage('Espelhando alterações na planilha do Google Sheets...');
+        try {
+          const nextEntriesBySchedule: Record<string, ScheduleEntry[]> = {
+            ...entriesBySchedule,
+            [selectedSchedule.id]: draftEntries,
+          };
+          const syncRes = await syncScheduleChangesToGoogleSheets(googleAccessToken, {
+            schedules,
+            entriesBySchedule: nextEntriesBySchedule,
+            personnel: [...personnel, ...newlyRegistered],
+            targetDates: Array.from(modifiedDatesSet),
+            removedCellValuesByDate,
+          });
+          sheetsStatusNote = ` Planilha Google atualizada (${syncRes.updatedFolgaCells} célula(s) de folga + ${BACKUP_MIRROR_SHEET_TITLE}).`;
+        } catch (sheetsErr) {
+          if (sheetsErr instanceof GoogleSheetsAuthError) {
+            setGoogleAccessToken(null);
+            sheetsStatusNote =
+              ' Aviso: sessão do Google Sheets expirou; reconecte para sincronizar a planilha.';
+          } else {
+            sheetsStatusNote =
+              ' Aviso: alterações salvas no site, mas houve falha ao atualizar o Google Sheets.';
+          }
+        }
+      }
+
       setShowPreviewModal(false);
       setFeedback({
         type: 'success',
         text:
-          newlyRegistered.length > 0
+          (newlyRegistered.length > 0
             ? `Alterações publicadas e ${newlyRegistered.length} novo(s) militar(es) cadastrado(s) automaticamente na base do efetivo.`
-            : 'Alterações salvas e refletidas automaticamente na planilha dinâmica.',
+            : 'Alterações salvas e refletidas automaticamente na planilha dinâmica.') +
+          sheetsStatusNote,
       });
     } catch (err) {
       handleActionError(err);
@@ -1074,6 +1266,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
+            {/* Google Sheets Live Backup Strip */}
+            <div className="btl-panel px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
+                <FileSpreadsheet
+                  className={`w-4 h-4 shrink-0 ${
+                    googleAccessToken ? 'text-[#83B499]' : 'text-[#C8A461]'
+                  }`}
+                />
+                <span className="font-semibold text-[#F4E6C4]">
+                  {googleAccessToken
+                    ? 'Planilha Google vinculada (sincronização ativa ao publicar)'
+                    : 'Planilha Google de backup'}
+                </span>
+                <a
+                  href={BACKUP_SPREADSHEET_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#E5C17B] hover:text-[#F4E6C4] hover:underline"
+                >
+                  <span>Abrir planilha</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {googleAccessToken ? (
+                  <button
+                    type="button"
+                    disabled={Boolean(busyMessage)}
+                    onClick={handleRequestFullGoogleSheetsSync}
+                    className="btl-btn btl-btn-secondary min-h-[36px] px-3 py-1.5 text-xs"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-[#A8D8BE]" />
+                    <span>Sincronizar tudo agora</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={connectingGoogleSheets || Boolean(busyMessage)}
+                    onClick={() => void handleConnectGoogleSheets()}
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-xs inline-flex items-center gap-2 border border-[#DADCE0] shadow-sm transition-colors cursor-pointer"
+                  >
+                    <GoogleMiniIcon className="w-4 h-4 shrink-0" />
+                    <span>
+                      {connectingGoogleSheets ? 'Conectando...' : 'Conectar Google Sheets'}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="btl-card overflow-hidden">
               <div className="overflow-x-auto schedule-scroll">
                 <table className="w-full border-collapse text-left">
@@ -1172,40 +1415,100 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                           </td>
 
-                          {selectedSchedule.columns.map((col) => (
-                            <td key={col.id} className="px-2 py-1.5 border-r border-[#EBE0C8]/8">
-                              <PersonnelAutocompleteInput
-                                compact
-                                value={entry.assignments[col.id] ?? ''}
-                                maxLength={BLUEPRINT_LIMITS.MAX_ASSIGNMENT_LEN}
-                                personnel={personnel}
-                                restOrderContext={{
-                                  targetDate: entry.date,
-                                  isRedScale: entry.isRedScale,
-                                  entriesBySchedule: liveEntriesBySchedule,
-                                  missions,
-                                  calendarDays,
-                                  defaultRankFilter: inferRankFilterFromScheduleContext(
-                                    `${selectedSchedule.name} ${col.label}`,
-                                    availablePersonnelRanks
-                                  ),
-                                }}
-                                onChange={(nextVal) =>
-                                  updateDraftCell(entry.date, col.id, nextVal)
-                                }
-                                onSelectPerson={(person) =>
-                                  updateDraftCell(
-                                    entry.date,
-                                    col.id,
-                                    formatPersonnelDisplay(person)
-                                  )
-                                }
-                                onQuickCreate={handleQuickCreateFromCell}
-                                placeholder="—"
-                                ariaLabel={`${col.label} em ${entry.date}`}
-                              />
-                            </td>
-                          ))}
+                          {selectedSchedule.columns.map((col) => {
+                            const rawCellVal = entry.assignments[col.id] ?? '';
+                            const parsedCell = parseDutyCell(rawCellVal);
+                            const openSwapModal = () =>
+                              setEditingSwapCell({
+                                date: entry.date,
+                                colId: col.id,
+                                colLabel: col.label,
+                                isRedScale: entry.isRedScale,
+                                scheduledValue: parsedCell.scheduledLabel,
+                                hasSwap: parsedCell.isSwap || Boolean(parsedCell.scheduledLabel),
+                                substituteValue: parsedCell.substituteLabel ?? '',
+                              });
+
+                            return (
+                              <td
+                                key={col.id}
+                                className="px-2 py-1.5 border-r border-[#EBE0C8]/8"
+                              >
+                                {parsedCell.isSwap && parsedCell.substituteLabel ? (
+                                  <button
+                                    type="button"
+                                    onClick={openSwapModal}
+                                    title={`Troca: ficou ${parsedCell.substituteLabel} no lugar de ${parsedCell.scheduledLabel} (clique para editar)`}
+                                    className="w-full min-h-[36px] px-2.5 py-1 rounded-md border border-[#38BDF8]/55 bg-[#075985]/26 hover:bg-[#075985]/40 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-semibold text-[#7DD3FC] truncate flex items-center gap-1">
+                                        <ArrowLeftRight className="w-3 h-3 text-[#38BDF8] shrink-0" />
+                                        <span className="truncate">
+                                          {parsedCell.substituteLabel}
+                                        </span>
+                                      </div>
+                                      <div className="text-[10px] text-[#98A89F] truncate">
+                                        Esc: {parsedCell.scheduledLabel}
+                                      </div>
+                                    </div>
+                                    <Pencil className="w-3 h-3 text-[#7DD3FC]/80 shrink-0" />
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <PersonnelAutocompleteInput
+                                      compact
+                                      className="flex-1 min-w-0"
+                                      value={rawCellVal}
+                                      maxLength={BLUEPRINT_LIMITS.MAX_ASSIGNMENT_LEN}
+                                      personnel={personnel}
+                                      restOrderContext={{
+                                        targetDate: entry.date,
+                                        isRedScale: entry.isRedScale,
+                                        entriesBySchedule: liveEntriesBySchedule,
+                                        missions,
+                                        calendarDays,
+                                        defaultRankFilter: inferRankFilterFromScheduleContext(
+                                          `${selectedSchedule.name} ${col.label}`,
+                                          availablePersonnelRanks
+                                        ),
+                                      }}
+                                      onChange={(nextVal) =>
+                                        updateDraftCell(entry.date, col.id, nextVal)
+                                      }
+                                      onSelectPerson={(person) =>
+                                        updateDraftCell(
+                                          entry.date,
+                                          col.id,
+                                          formatPersonnelDisplay(person)
+                                        )
+                                      }
+                                      onQuickCreate={handleQuickCreateFromCell}
+                                      placeholder="—"
+                                      ariaLabel={`${col.label} em ${entry.date}`}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={openSwapModal}
+                                      title={
+                                        parsedCell.scheduledLabel
+                                          ? 'Registrar troca (outro militar ficou no lugar)'
+                                          : 'Escalar ou registrar troca'
+                                      }
+                                      aria-label={`Troca de serviço em ${col.label} dia ${entry.date}`}
+                                      className={`min-w-[30px] min-h-[30px] rounded-md border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                                        parsedCell.scheduledLabel
+                                          ? 'bg-[#075985]/20 border-[#38BDF8]/35 text-[#7DD3FC] hover:bg-[#075985]/40 hover:border-[#7DD3FC]/60'
+                                          : 'bg-transparent border-transparent text-[#4F6056] hover:text-[#98A89F] hover:border-[#EBE0C8]/18'
+                                      }`}
+                                    >
+                                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            );
+                          })}
 
                           <td className="px-3 py-1.5 text-right whitespace-nowrap">
                             <button
@@ -1482,12 +1785,62 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <span className="text-xs font-medium text-[#98A89F]">{diff.fieldLabel}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs sm:text-sm">
-                      <span className="text-[#FCA5A5] line-through">{diff.before}</span>
+                      <span className="text-[#FCA5A5] line-through">
+                        {formatDiffDisplayValue(diff.before)}
+                      </span>
                       <span className="text-[#697870]">→</span>
-                      <span className="font-semibold text-[#A8D8BE]">{diff.after}</span>
+                      <span className="font-semibold text-[#A8D8BE]">
+                        {formatDiffDisplayValue(diff.after)}
+                      </span>
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Explicit Google Sheets Sync Confirmation Block */}
+              <div className="px-6 py-3.5 bg-[#0A120E] border-t border-[#EBE0C8]/12 space-y-2">
+                {googleAccessToken ? (
+                  <label className="flex items-start gap-2.5 text-xs text-[#C8D4CD] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={syncGoogleSheetsOnSave}
+                      onChange={(e) => setSyncGoogleSheetsOnSave(e.target.checked)}
+                      className="mt-0.5 accent-[#83B499]"
+                    />
+                    <span className="leading-relaxed">
+                      Atualizar também a{' '}
+                      <a
+                        href={BACKUP_SPREADSHEET_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[#E5C17B] hover:underline font-medium"
+                      >
+                        planilha do Google Sheets vinculada
+                      </a>{' '}
+                      (abas de folga + aba Escalas SIEB) com as {modifiedDatesSet.size} data(s)
+                      modificada(s).
+                    </span>
+                  </label>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                    <span className="text-[#98A89F]">
+                      Conecte sua conta Google para enviar estas alterações automaticamente para a
+                      planilha de backup.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={connectingGoogleSheets}
+                      onClick={() => void handleConnectGoogleSheets()}
+                      className="min-h-[34px] px-3 py-1 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-xs inline-flex items-center gap-2 border border-[#DADCE0] shrink-0 cursor-pointer"
+                    >
+                      <GoogleMiniIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>
+                        {connectingGoogleSheets ? 'Conectando...' : 'Conectar Google Sheets'}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex items-center justify-end gap-3">
@@ -1947,8 +2300,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   disabled={Boolean(busyMessage)}
                   onClick={async () => {
                     const fn = confirmAction.onConfirm;
+                    const label = confirmAction.busyLabel || 'Executando operação...';
                     setConfirmAction(null);
-                    setBusyMessage('Executando exclusão...');
+                    setBusyMessage(label);
                     try {
                       await fn();
                     } catch (err) {
@@ -1957,12 +2311,205 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       setBusyMessage('');
                     }
                   }}
-                  className="btl-btn btl-btn-danger text-sm"
+                  className={`btl-btn text-sm ${
+                    confirmAction.variant === 'primary' ? 'btl-btn-primary' : 'btl-btn-danger'
+                  }`}
                 >
                   {confirmAction.confirmLabel}
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* DUTY SWAP / SUBSTITUTION MODAL (Escalado vs Troca) */}
+      <AnimatePresence>
+        {editingSwapCell && selectedSchedule && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={TRANSITION_MICRO}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setEditingSwapCell(null)}
+          >
+            <motion.form
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={SPRING_MODAL}
+              onClick={(e) => e.stopPropagation()}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const scheduled = editingSwapCell.scheduledValue.trim();
+                const sub = editingSwapCell.hasSwap ? editingSwapCell.substituteValue.trim() : '';
+                if (!scheduled) {
+                  updateDraftCell(editingSwapCell.date, editingSwapCell.colId, '');
+                } else {
+                  updateDraftCell(
+                    editingSwapCell.date,
+                    editingSwapCell.colId,
+                    formatDutyCell(scheduled, sub)
+                  );
+                }
+                setEditingSwapCell(null);
+              }}
+              className="w-full max-w-md btl-modal overflow-hidden"
+            >
+              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#38BDF8]/25 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#075985]/35 border border-[#38BDF8]/45 text-[#7DD3FC] shrink-0">
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-base font-semibold text-[#F4E6C4] truncate">
+                      Escalação e Troca
+                    </h3>
+                    <p className="text-xs text-[#98A89F] truncate">
+                      {editingSwapCell.colLabel} · {formatFullDatePt(editingSwapCell.date)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingSwapCell(null)}
+                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-[#A8D8BE]">
+                    1. Militar escalado (conta na escala e na folga)
+                  </label>
+                  <PersonnelAutocompleteInput
+                    value={editingSwapCell.scheduledValue}
+                    maxLength={80}
+                    personnel={personnel}
+                    restOrderContext={{
+                      targetDate: editingSwapCell.date,
+                      isRedScale: editingSwapCell.isRedScale,
+                      entriesBySchedule: liveEntriesBySchedule,
+                      missions,
+                      calendarDays,
+                      defaultRankFilter: inferRankFilterFromScheduleContext(
+                        `${selectedSchedule.name} ${editingSwapCell.colLabel}`,
+                        availablePersonnelRanks
+                      ),
+                    }}
+                    onChange={(nextVal) =>
+                      setEditingSwapCell({ ...editingSwapCell, scheduledValue: nextVal })
+                    }
+                    onSelectPerson={(person) =>
+                      setEditingSwapCell({
+                        ...editingSwapCell,
+                        scheduledValue: formatPersonnelDisplay(person),
+                      })
+                    }
+                    onQuickCreate={handleQuickCreateFromCell}
+                    placeholder="Selecione o militar escalado..."
+                  />
+                </div>
+
+                {/* Two explicit options: Escalado normal vs Troca */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingSwapCell({
+                        ...editingSwapCell,
+                        hasSwap: false,
+                        substituteValue: '',
+                      })
+                    }
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-semibold text-center transition-colors cursor-pointer ${
+                      !editingSwapCell.hasSwap
+                        ? 'bg-[#2D5A43]/35 border-[#83B499]/60 text-[#F4E6C4]'
+                        : 'bg-[#090F0C]/70 border-[#EBE0C8]/12 text-[#98A89F] hover:text-[#E4EAE6]'
+                    }`}
+                  >
+                    Sem troca (Escalado)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingSwapCell({ ...editingSwapCell, hasSwap: true })}
+                    className={`px-3 py-2.5 rounded-xl border text-xs font-semibold text-center inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      editingSwapCell.hasSwap
+                        ? 'bg-[#075985]/38 border-[#38BDF8]/65 text-[#7DD3FC]'
+                        : 'bg-[#090F0C]/70 border-[#EBE0C8]/12 text-[#98A89F] hover:text-[#E4EAE6]'
+                    }`}
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    <span>Troca de serviço</span>
+                  </button>
+                </div>
+
+                {editingSwapCell.hasSwap && (
+                  <div className="space-y-2 p-3.5 rounded-xl bg-[#075985]/16 border border-[#38BDF8]/35">
+                    <label className="block text-xs font-semibold text-[#7DD3FC]">
+                      2. Quem ficou no lugar (não conta na escala deste militar)
+                    </label>
+                    <PersonnelAutocompleteInput
+                      value={editingSwapCell.substituteValue}
+                      maxLength={80}
+                      personnel={personnel}
+                      onChange={(nextVal) =>
+                        setEditingSwapCell({ ...editingSwapCell, substituteValue: nextVal })
+                      }
+                      onSelectPerson={(person) =>
+                        setEditingSwapCell({
+                          ...editingSwapCell,
+                          substituteValue: formatPersonnelDisplay(person),
+                        })
+                      }
+                      onQuickCreate={handleQuickCreateFromCell}
+                      placeholder="Digite o nome de quem ficou no lugar..."
+                    />
+                    <p className="text-[11px] text-[#98A89F] leading-relaxed">
+                      Na escala pública aparecerá{' '}
+                      <span className="text-[#7DD3FC] font-semibold">
+                        {editingSwapCell.substituteValue.trim() || 'quem ficou no lugar'}
+                      </span>{' '}
+                      em cor diferenciada (azul). O serviço contará apenas na escala e folga de{' '}
+                      <span className="text-[#F4E6C4] font-semibold">
+                        {editingSwapCell.scheduledValue.trim() || 'quem foi escalado'}
+                      </span>
+                      .
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex items-center justify-between gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    updateDraftCell(editingSwapCell.date, editingSwapCell.colId, '');
+                    setEditingSwapCell(null);
+                  }}
+                  className="text-xs font-medium text-[#FCA5A5] hover:underline cursor-pointer"
+                >
+                  Limpar célula
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSwapCell(null)}
+                    className="btl-btn btl-btn-secondary text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btl-btn btl-btn-primary text-sm px-5">
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            </motion.form>
           </motion.div>
         )}
       </AnimatePresence>

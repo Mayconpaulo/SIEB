@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { signInWithPopup, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
@@ -10,7 +10,6 @@ import {
   KeyRound,
   Lock,
   RefreshCw,
-  ShieldCheck,
   X,
 } from 'lucide-react';
 import {
@@ -25,8 +24,34 @@ import {
   type AdminAuthMode,
   type FirebasePasscodeRecord,
 } from '../lib/adminApi';
-import { auth, firebaseProjectId, googleProvider } from '../lib/firebase';
+import {
+  auth,
+  firebaseProjectId,
+  googleProvider,
+  setGoogleAccessToken,
+} from '../lib/firebase';
 import { SPRING_MODAL, TRANSITION_MICRO } from '../lib/motion';
+
+const GoogleBrandIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4 shrink-0' }) => (
+  <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+    <path
+      fill="#EA4335"
+      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+    />
+    <path
+      fill="#4285F4"
+      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+    />
+    <path
+      fill="#34A853"
+      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+    />
+  </svg>
+);
 
 interface AdminAuthModalProps {
   isOpen: boolean;
@@ -140,6 +165,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         setErrorMsg('A conta selecionada precisa possuir e-mail verificado.');
         return;
       }
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGoogleAccessToken(credential.accessToken);
+      }
       await loadFirebasePasscodeState();
     } catch (err: unknown) {
       if (err instanceof AdminApiError) {
@@ -244,6 +273,10 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
       if (!result.user.emailVerified) {
         setErrorMsg('A conta selecionada precisa possuir e-mail verificado para gravar no banco.');
         return;
+      }
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGoogleAccessToken(credential.accessToken);
       }
       onAuthenticated(verifiedServerToken);
     } catch (err: unknown) {
@@ -420,11 +453,11 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       type="button"
                       disabled={linkingDb}
                       onClick={() => void handleFirebaseAdminSignIn()}
-                      className="btl-btn btl-btn-primary w-full min-h-[44px] text-sm"
+                      className="w-full min-h-[44px] px-4 py-2 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-sm inline-flex items-center justify-center gap-2.5 border border-[#DADCE0] shadow-sm transition-colors cursor-pointer"
                     >
-                      <ShieldCheck className="w-4 h-4" />
+                      <GoogleBrandIcon className="w-[18px] h-[18px] shrink-0" />
                       <span>
-                        {linkingDb ? 'Validando conta...' : 'Continuar com conta administradora'}
+                        {linkingDb ? 'Validando conta...' : 'Entrar com o Google'}
                       </span>
                     </button>
                     <button
@@ -464,11 +497,11 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       type="button"
                       disabled={linkingDb}
                       onClick={() => void handleAuthorizeDatabase()}
-                      className="btl-btn btl-btn-primary w-full min-h-[44px] text-sm"
+                      className="w-full min-h-[44px] px-4 py-2 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-sm inline-flex items-center justify-center gap-2.5 border border-[#DADCE0] shadow-sm transition-colors cursor-pointer"
                     >
-                      <ShieldCheck className="w-4 h-4" />
+                      <GoogleBrandIcon className="w-[18px] h-[18px] shrink-0" />
                       <span>
-                        {linkingDb ? 'Confirmando...' : 'Confirmar acesso ao banco (Google)'}
+                        {linkingDb ? 'Confirmando...' : 'Entrar com o Google'}
                       </span>
                     </button>
                     <button

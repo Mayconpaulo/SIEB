@@ -105,6 +105,9 @@ export interface MatrixDayEvent {
   restBeforeDuty?: number | null;
   scheduleId?: string;
   missionId?: string;
+  isSwap?: boolean;
+  scheduledLabel?: string;
+  substituteLabel?: string;
 }
 
 export interface MatrixCellData {

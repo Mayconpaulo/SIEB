@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
+  ArrowLeftRight,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
@@ -366,14 +367,18 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
     const label = cell.displayLabel || cell.primaryCode;
     const hasMissionOverlay =
       (cell.primaryCode === 'P' || cell.primaryCode === 'V') && cell.codes.includes('M');
+    const hasSwap = cell.events.some((ev) => ev.isSwap);
 
     return (
       <span
         className={`inline-flex flex-col items-center justify-center w-full min-h-[28px] px-1.5 py-0.5 rounded-md border font-mono text-[10px] leading-[1.15] font-bold tracking-tight text-center ${getCellBadgeStyle(
           cell.primaryCode
-        )}`}
+        )} ${hasSwap ? 'ring-1 ring-[#38BDF8]/80' : ''}`}
       >
-        <span className="break-words">{label}</span>
+        <span className="inline-flex items-center justify-center gap-0.5 break-words">
+          {hasSwap && <ArrowLeftRight className="w-2.5 h-2.5 text-[#7DD3FC] shrink-0" />}
+          <span>{label}</span>
+        </span>
         {hasMissionOverlay && (
           <span className="text-[8px] leading-none text-[#F4E6C4] font-semibold mt-0.5">
             +M
@@ -985,7 +990,11 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                       ev.restBeforeDuty !== null && ev.restBeforeDuty !== undefined
                                         ? ` · Folga ${ev.restBeforeDuty}×1`
                                         : '';
-                                    return `${ev.detail} — ${ev.label} (${getEventDotLabel(ev.code)}${folgaNote})`;
+                                    const swapNote =
+                                      ev.isSwap && ev.substituteLabel
+                                        ? ` · Troca: ficou ${ev.substituteLabel}`
+                                        : '';
+                                    return `${ev.detail} — ${ev.label} (${getEventDotLabel(ev.code)}${folgaNote}${swapNote})`;
                                   })
                                   .join(' | ')}
                                 onClick={() =>
@@ -1226,6 +1235,18 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                     <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-[#075985]/28 border border-[#38BDF8]/30 font-mono text-[10px] font-semibold text-[#7DD3FC]">
                                       Folga {ev.restBeforeDuty}×1
                                     </span>
+                                  )}
+                                  {ev.isSwap && ev.substituteLabel && (
+                                    <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#075985]/28 border border-[#38BDF8]/40 text-[11px] text-[#7DD3FC]">
+                                      <ArrowLeftRight className="w-3 h-3 shrink-0" />
+                                      <span>
+                                        Troca: ficou <strong>{ev.substituteLabel}</strong> no lugar
+                                        (serviço contabilizado para{' '}
+                                        {ev.scheduledLabel ||
+                                          formatPersonnelDisplay(inspectedRow.row.person)}
+                                        )
+                                      </span>
+                                    </div>
                                   )}
                                 </div>
                               </div>
