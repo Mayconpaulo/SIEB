@@ -113,8 +113,8 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
   if (!selectedSchedule) {
     return (
       <div className="btl-card p-10 text-center space-y-2">
-        <p className="text-base font-semibold text-[#F4E6C4]">Nenhuma escala cadastrada</p>
-        <p className="text-sm text-[#98A89F]">
+        <p className="text-base font-semibold text-[#F1F5F3]">Nenhuma escala cadastrada</p>
+        <p className="text-sm text-[#A4B3AB]">
           Acesse a Área Administrativa para cadastrar a primeira escala de serviço.
         </p>
       </div>
@@ -123,8 +123,8 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Schedule Model Switcher (scales smoothly to 6+ spreadsheets with spring tab slide) */}
-      <div className="space-y-4">
+      {/* Schedule Model Switcher */}
+      <div className="space-y-5">
         <div
           className="btl-tab-track flex items-center gap-1 overflow-x-auto schedule-scroll"
           role="tablist"
@@ -139,15 +139,15 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                 role="tab"
                 aria-selected={active}
                 onClick={() => onSelectSchedule(s.id)}
-                className={`relative min-h-[40px] px-4 py-2 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
-                  active ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                className={`relative min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                  active ? 'text-[#F1F5F3] font-semibold' : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
                 }`}
               >
                 {active && (
                   <motion.span
                     layoutId="viewer-schedule-tab"
                     transition={SPRING_TAB}
-                    className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/22 to-[#2D5A43]/34 border border-[#C8A461]/45 shadow-[inset_0_1px_0_rgba(255,250,236,0.22)]"
+                    className="absolute inset-0 rounded-md bg-[#1C2521] border border-[#63512C]"
                   />
                 )}
                 <span className="relative z-10">{s.name}</span>
@@ -158,20 +158,20 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F4E6C4]">
+            <h1 className="font-display text-2xl sm:text-[26px] font-bold tracking-tight text-[#F1F5F3]">
               {selectedSchedule.name}
             </h1>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#98A89F]">
-              <span className="tabular-nums text-[#E5C17B] font-medium">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#A4B3AB]">
+              <span className="tabular-nums text-[#DFBE78] font-medium">
                 {selectedSchedule.columns.length} funções
               </span>
-              <span aria-hidden="true" className="text-[#697870]">·</span>
+              <span aria-hidden="true" className="text-[#374840]">·</span>
               <span className="tabular-nums">
                 {filteredEntries.length} de {entries.length} dias exibidos
               </span>
               {entries.length > 0 && (
                 <>
-                  <span aria-hidden="true" className="text-[#697870]">·</span>
+                  <span aria-hidden="true" className="text-[#374840]">·</span>
                   <span className="font-mono tabular-nums">
                     {formatShortDatePt(entries[0].date)} –{' '}
                     {formatShortDatePt(entries[entries.length - 1].date)}
@@ -190,17 +190,17 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
             <button
               type="button"
               onClick={() => onChangeViewMode('table')}
-              className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+              className={`relative inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${
                 viewMode === 'table'
-                  ? 'text-[#F4E6C4]'
-                  : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                  ? 'text-[#F1F5F3] font-semibold'
+                  : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
               }`}
             >
               {viewMode === 'table' && (
                 <motion.span
                   layoutId="viewer-mode-tab"
                   transition={SPRING_TAB}
-                  className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#2D5A43]/75 to-[#1E3F2E]/85 border border-[#83B499]/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+                  className="absolute inset-0 rounded-md bg-[#24533C] border border-[#367657]"
                 />
               )}
               <Table2 className="w-4 h-4 relative z-10" />
@@ -209,17 +209,17 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
             <button
               type="button"
               onClick={() => onChangeViewMode('daily')}
-              className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+              className={`relative inline-flex items-center gap-1.5 min-h-[36px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-md whitespace-nowrap transition-colors cursor-pointer ${
                 viewMode === 'daily'
-                  ? 'text-[#F4E6C4]'
-                  : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                  ? 'text-[#F1F5F3] font-semibold'
+                  : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
               }`}
             >
               {viewMode === 'daily' && (
                 <motion.span
                   layoutId="viewer-mode-tab"
                   transition={SPRING_TAB}
-                  className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#2D5A43]/75 to-[#1E3F2E]/85 border border-[#83B499]/40 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]"
+                  className="absolute inset-0 rounded-md bg-[#24533C] border border-[#367657]"
                 />
               )}
               <CalendarDays className="w-4 h-4 relative z-10" />
@@ -232,7 +232,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
       {/* Filter Bar */}
       <div className="btl-panel p-4 flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
         <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#C8A45D] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={searchTerm}
@@ -245,7 +245,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
             <button
               type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#A4B3AB] hover:text-[#F1F5F3] cursor-pointer"
               aria-label="Limpar busca"
             >
               <X className="w-4 h-4" />
@@ -254,7 +254,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
         </div>
 
         <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
-          <label className="flex items-center gap-1.5 text-xs text-[#98A89F] flex-1 sm:flex-initial">
+          <label className="flex items-center gap-1.5 text-xs text-[#A4B3AB] flex-1 sm:flex-initial">
             <span className="shrink-0">De</span>
             <input
               type="date"
@@ -263,7 +263,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
               className="btl-input sm:w-auto px-2.5 py-1.5 text-xs sm:text-sm font-mono tabular-nums"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-xs text-[#98A89F] flex-1 sm:flex-initial">
+          <label className="flex items-center gap-1.5 text-xs text-[#A4B3AB] flex-1 sm:flex-initial">
             <span className="shrink-0">Até</span>
             <input
               type="date"
@@ -300,10 +300,10 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
       {/* Empty Search Result State */}
       {filteredEntries.length === 0 ? (
         <div className="btl-card p-10 text-center space-y-3">
-          <p className="text-base font-semibold text-[#F4E6C4]">
+          <p className="text-base font-semibold text-[#F1F5F3]">
             Nenhum registro encontrado para os filtros aplicados
           </p>
-          <p className="text-sm text-[#98A89F]">
+          <p className="text-sm text-[#A4B3AB]">
             Verifique a grafia do nome do militar ou amplie o período selecionado.
           </p>
           <button
@@ -321,7 +321,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
       ) : (
         <AnimatePresence mode="wait">
           {viewMode === 'table' ? (
-            /* MODO TABELA — Faithful Spreadsheet View */
+            /* MODO TABELA — Clean Matte Spreadsheet View */
             <motion.div
               key={`table-${selectedSchedule.id}`}
               variants={VIEW_VARIANTS}
@@ -334,10 +334,10 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
               <div className="overflow-x-auto schedule-scroll">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="bg-[#0B120E] text-[#F4E6C4] border-b border-[#C9A961]/25">
+                    <tr className="bg-[#161D1A] text-[#F1F5F3] border-b border-[#28352F]">
                       <th
                         scope="col"
-                        className="sticky left-0 z-20 bg-[#0B120E] px-3.5 py-3.5 text-xs font-semibold tracking-wide border-r border-[#EBE0C8]/15 whitespace-nowrap min-w-[146px]"
+                        className="sticky left-0 z-20 bg-[#161D1A] px-3.5 py-3 text-xs font-semibold tracking-wide border-r border-[#28352F] whitespace-nowrap min-w-[146px]"
                       >
                         Data / Dia
                       </th>
@@ -345,26 +345,26 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                         <th
                           key={col.id}
                           scope="col"
-                          className="px-4 py-3.5 text-xs sm:text-[13px] font-semibold border-r last:border-r-0 border-[#EBE0C8]/10 whitespace-nowrap min-w-[165px]"
+                          className="px-4 py-3 text-xs sm:text-[13px] font-semibold border-r last:border-r-0 border-[#1F2924] whitespace-nowrap min-w-[165px]"
                         >
                           {col.label}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
+                  <tbody className="divide-y divide-[#1C2521] text-sm">
                     {filteredEntries.map((entry) => {
                       const isToday = entry.date === todayIso;
                       const rowBg = isToday
-                        ? 'bg-[#2D5A43]/22'
+                        ? 'bg-[#13281E]'
                         : entry.isRedScale
-                        ? 'bg-[#7F1D1D]/18'
-                        : 'bg-transparent hover:bg-[#E4EAE6]/[0.04]';
+                        ? 'bg-[#1F1113]'
+                        : 'bg-[#111614] hover:bg-[#161D1A]';
                       const stickyBg = isToday
-                        ? 'bg-[#12261C]'
+                        ? 'bg-[#13281E]'
                         : entry.isRedScale
-                        ? 'bg-[#231012]'
-                        : 'bg-[#0C1310]';
+                        ? 'bg-[#221214]'
+                        : 'bg-[#111614]';
 
                       return (
                         <tr
@@ -375,7 +375,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                         >
                           <th
                             scope="row"
-                            className={`sticky left-0 z-10 ${stickyBg} px-3.5 py-2.5 border-r border-[#EBE0C8]/12 whitespace-nowrap font-normal align-middle`}
+                            className={`sticky left-0 z-10 ${stickyBg} px-3.5 py-2.5 border-r border-[#28352F] whitespace-nowrap font-normal align-middle`}
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-baseline gap-2">
@@ -384,8 +384,8 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                                     entry.isRedScale
                                       ? 'text-[#FCA5A5]'
                                       : isToday
-                                      ? 'text-[#A8D8BE]'
-                                      : 'text-[#E4EAE6]'
+                                      ? 'text-[#8CC4A7]'
+                                      : 'text-[#F1F5F3]'
                                   }`}
                                 >
                                   {formatShortDatePt(entry.date)}
@@ -394,14 +394,14 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                                   className={`font-mono text-xs tabular-nums ${
                                     entry.isRedScale
                                       ? 'text-[#F87171] font-medium'
-                                      : 'text-[#7D8F85]'
+                                      : 'text-[#6E7E76]'
                                   }`}
                                 >
                                   ({entry.dayOfWeek})
                                 </span>
                               </div>
                               {isToday && (
-                                <span className="text-[11px] font-semibold text-[#A8D8BE]">
+                                <span className="text-[11px] font-semibold text-[#8CC4A7]">
                                   Hoje
                                 </span>
                               )}
@@ -416,7 +416,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                           {selectedSchedule.columns.map((col) => (
                             <td
                               key={col.id}
-                              className="px-4 py-2.5 border-r last:border-r-0 border-[#EBE0C8]/8 align-middle whitespace-nowrap text-[13px] sm:text-sm"
+                              className="px-4 py-2.5 border-r last:border-r-0 border-[#1C2521] align-middle whitespace-nowrap text-[13px] sm:text-sm"
                             >
                               <DutyAssignmentBadge
                                 rawValue={entry.assignments[col.id] ?? ''}
@@ -441,7 +441,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
               </div>
             </motion.div>
           ) : (
-            /* MODO DIÁRIO — Mobile-First Ergonomic Day Blocks */
+            /* MODO DIÁRIO — Clean Solid Day View */
             <motion.div
               key={`daily-${selectedSchedule.id}`}
               variants={VIEW_VARIANTS}
@@ -477,14 +477,14 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                           key={entry.date}
                           type="button"
                           onClick={() => onChangeFocusedDate(entry.date)}
-                          className={`min-w-[56px] min-h-[54px] px-2.5 py-1.5 rounded-lg flex flex-col items-center justify-center shrink-0 border transition-all cursor-pointer ${
+                          className={`min-w-[56px] min-h-[54px] px-2.5 py-1.5 rounded-lg flex flex-col items-center justify-center shrink-0 border transition-colors cursor-pointer ${
                             isSelected
-                              ? 'bg-gradient-to-b from-[#2D5A43]/85 to-[#1B3A2A]/90 border-[#C8A461]/60 text-[#F4E6C4] shadow-[inset_0_1px_0_rgba(255,250,236,0.22)]'
+                              ? 'bg-[#24533C] border-[#C8A45D] text-[#F1F5F3]'
                               : isToday
-                              ? 'bg-[#2D5A43]/22 text-[#A8D8BE] border-[#83B499]/40 hover:border-[#83B499]/70'
+                              ? 'bg-[#13281E] text-[#8CC4A7] border-[#367657] hover:border-[#4B9973]'
                               : entry.isRedScale
-                              ? 'bg-[#7F1D1D]/20 text-[#FCA5A5] border-[#F87171]/25 hover:bg-[#7F1D1D]/30'
-                              : 'bg-[#0C1310]/70 text-[#98A89F] border-[#EBE0C8]/10 hover:text-[#E4EAE6] hover:border-[#EBE0C8]/25'
+                              ? 'bg-[#221214] text-[#FCA5A5] border-[#5A262B] hover:bg-[#2C1619]'
+                              : 'bg-[#0D1210] text-[#A4B3AB] border-[#1F2924] hover:text-[#F1F5F3] hover:border-[#374840]'
                           }`}
                         >
                           <span className="text-[11px] font-medium leading-none opacity-85">
@@ -496,7 +496,7 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                           {isToday && (
                             <span
                               className={`text-[9px] font-semibold mt-0.5 leading-none ${
-                                isSelected ? 'text-[#E5C17B]' : 'text-[#A8D8BE]'
+                                isSelected ? 'text-[#DFBE78]' : 'text-[#8CC4A7]'
                               }`}
                             >
                               Hoje
@@ -537,31 +537,31 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                     <div
                       className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3 ${
                         activeDailyEntry.date === todayIso
-                          ? 'bg-gradient-to-r from-[#1A3829]/90 to-[#0E1F17]/90 border-[#83B499]/30'
+                          ? 'bg-[#13281E] border-[#2E6248]'
                           : activeDailyEntry.isRedScale
-                          ? 'bg-gradient-to-r from-[#451418]/90 to-[#220E10]/90 border-[#F87171]/30'
-                          : 'bg-[#0B120E]/90 border-[#C9A961]/22'
+                          ? 'bg-[#241214] border-[#5A262B]'
+                          : 'bg-[#161D1A] border-[#1F2924]'
                       }`}
                     >
                       <div>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#C8D4CD]">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#A4B3AB]">
                           <span>{selectedSchedule.name}</span>
                           {activeDailyEntry.date === todayIso && (
                             <>
-                              <span aria-hidden="true" className="text-[#697870]">·</span>
-                              <span className="font-semibold text-[#A8D8BE]">Serviço de Hoje</span>
+                              <span aria-hidden="true" className="text-[#374840]">·</span>
+                              <span className="font-semibold text-[#8CC4A7]">Serviço de Hoje</span>
                             </>
                           )}
                           {activeDailyEntry.isRedScale && (
                             <>
-                              <span aria-hidden="true" className="text-[#697870]">·</span>
+                              <span aria-hidden="true" className="text-[#374840]">·</span>
                               <span className="text-[#FCA5A5]">
                                 {activeDailyEntry.holidayLabel || 'Escala Vermelha'}
                               </span>
                             </>
                           )}
                         </div>
-                        <h2 className="font-display text-lg sm:text-xl font-bold font-mono tabular-nums text-[#F4E6C4] mt-0.5">
+                        <h2 className="font-display text-lg sm:text-xl font-bold font-mono tabular-nums text-[#F1F5F3] mt-0.5">
                           {formatFullDatePt(activeDailyEntry.date)}
                         </h2>
                       </div>
@@ -571,13 +571,13 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                           type="checkbox"
                           checked={onlyAssignedInDaily}
                           onChange={(e) => setOnlyAssignedInDaily(e.target.checked)}
-                          className="rounded border-[#EBE0C8]/30 accent-[#C8A461]"
+                          className="rounded border-[#374840] accent-[#C8A45D]"
                         />
                         <span>Ocultar funções vazias</span>
                       </label>
                     </div>
 
-                    <div className="divide-y divide-[#EBE0C8]/10">
+                    <div className="divide-y divide-[#1C2521]">
                       {selectedSchedule.columns
                         .filter(
                           (col) =>
@@ -589,17 +589,17 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                           return (
                             <div
                               key={col.id}
-                              className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-6 hover:bg-[#E4EAE6]/[0.025] transition-colors"
+                              className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-6 hover:bg-[#161D1A] transition-colors"
                             >
-                              <div className="text-xs font-semibold text-[#C8D4CD]">
+                              <div className="text-xs font-semibold text-[#A4B3AB]">
                                 {col.label}
                               </div>
-                              <div className="text-base sm:text-right">
+                              <div className="text-sm sm:text-base sm:text-right">
                                 <DutyAssignmentBadge
                                   rawValue={value}
                                   highlightTerm={normalizedQuery}
                                   emptyFallback={
-                                    <span className="text-sm text-[#697870]">Sem escalação</span>
+                                    <span className="text-sm text-[#6E7E76]">Sem escalação</span>
                                   }
                                   onInspectSwap={(scheduledLabel, substituteLabel) =>
                                     setSwapDetail({
@@ -618,8 +618,8 @@ export const ScheduleViewer: React.FC<ScheduleViewerProps> = ({
                     </div>
 
                     {activeDailyEntry.notes && (
-                      <div className="px-5 py-3.5 bg-[#090F0C]/80 border-t border-[#EBE0C8]/10 text-xs text-[#98A89F]">
-                        <strong className="text-[#E5C17B]">Observação:</strong>{' '}
+                      <div className="px-5 py-3.5 bg-[#0D1210] border-t border-[#1F2924] text-xs text-[#A4B3AB]">
+                        <strong className="text-[#DFBE78]">Observação:</strong>{' '}
                         {activeDailyEntry.notes}
                       </div>
                     )}

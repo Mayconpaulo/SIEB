@@ -308,7 +308,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
         onKeyDown={handleKeyDown}
         className={
           compact
-            ? 'w-full min-h-[36px] px-2.5 py-1 text-xs sm:text-[13px] font-medium text-[#E4EAE6] placeholder:text-[#4F6056] bg-[#090F0C]/60 border border-transparent hover:border-[#EBE0C8]/22 focus:bg-[#080B09] focus:border-[#C8A461] focus:outline-none rounded-md transition-colors'
+            ? 'w-full min-h-[36px] px-2.5 py-1 text-xs sm:text-[13px] font-medium text-[#F1F5F3] placeholder:text-[#55665E] bg-[#0D1210] border border-transparent hover:border-[#28352F] focus:bg-[#0A0D0C] focus:border-[#C8A45D] focus:outline-none rounded-md transition-colors'
             : 'btl-input px-3.5 py-2'
         }
       />
@@ -327,17 +327,17 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
               width: dropdownPos.width,
               transform: dropdownPos.openUpward ? 'translateY(-100%)' : undefined,
             }}
-            className="z-[90] rounded-xl bg-[#0B130F]/98 border border-[#C9A961]/38 shadow-2xl backdrop-blur-xl overflow-hidden flex flex-col max-h-80"
+            className="z-[90] rounded-xl bg-[#111614] border border-[#28352F] shadow-[0_18px_40px_rgba(0,0,0,0.65)] overflow-hidden flex flex-col max-h-80"
           >
             {/* Rest Order Header & Quick Rank Chips */}
             {restOrderContext ? (
-              <div className="px-3 py-2 bg-[#080E0B] border-b border-[#EBE0C8]/12 space-y-1.5 shrink-0">
+              <div className="px-3 py-2 bg-[#161D1A] border-b border-[#1F2924] space-y-1.5 shrink-0">
                 <div className="flex items-center justify-between gap-2 text-[11px]">
-                  <span className="font-semibold text-[#F4E6C4] flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-[#C8A461]" />
+                  <span className="font-semibold text-[#F1F5F3] flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-[#C8A45D]" />
                     <span>
                       Ordem de Folga
-                      <span className="ml-1.5 font-mono text-[10px] font-normal text-[#98A89F]">
+                      <span className="ml-1.5 font-mono text-[10px] font-normal text-[#A4B3AB]">
                         ({allRestCandidates.length})
                       </span>
                     </span>
@@ -345,8 +345,8 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                   <span
                     className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
                       restOrderContext.isRedScale
-                        ? 'bg-[#7F1D1D]/45 text-[#FCA5A5] border-[#F87171]/35'
-                        : 'bg-[#2D5A43]/40 text-[#A8D8BE] border-[#83B499]/35'
+                        ? 'bg-[#241214] text-[#FCA5A5] border-[#5A262B]'
+                        : 'bg-[#13281E] text-[#8CC4A7] border-[#2D6248]'
                     }`}
                   >
                     {restOrderContext.isRedScale ? 'Vermelha (V)' : 'Preta (P)'}
@@ -363,8 +363,8 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                       }}
                       className={`px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap cursor-pointer transition-colors ${
                         selectedRankFilter === 'all'
-                          ? 'bg-[#C8A461]/28 text-[#F4E6C4] border border-[#C8A461]/50'
-                          : 'bg-[#121D17] text-[#98A89F] hover:text-[#E4EAE6] border border-transparent'
+                          ? 'bg-[#1C2521] text-[#DFBE78] border border-[#63512C]'
+                          : 'bg-[#0D1210] text-[#A4B3AB] hover:text-[#F1F5F3] border border-[#1F2924]'
                       }`}
                     >
                       Todos
@@ -379,8 +379,8 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                         }}
                         className={`px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap cursor-pointer transition-colors ${
                           selectedRankFilter === rank
-                            ? 'bg-[#C8A461]/28 text-[#F4E6C4] border border-[#C8A461]/50'
-                            : 'bg-[#121D17] text-[#98A89F] hover:text-[#E4EAE6] border border-transparent'
+                            ? 'bg-[#1C2521] text-[#DFBE78] border border-[#63512C]'
+                            : 'bg-[#0D1210] text-[#A4B3AB] hover:text-[#F1F5F3] border border-[#1F2924]'
                         }`}
                       >
                         {rank}
@@ -391,9 +391,9 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
               </div>
             ) : (
               trimmedValue.length > 0 && (
-                <div className="px-3 py-1.5 bg-[#080E0B] border-b border-[#EBE0C8]/12 flex items-center justify-between text-[10px] text-[#98A89F] font-mono shrink-0">
+                <div className="px-3 py-1.5 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between text-[10px] text-[#A4B3AB] font-mono shrink-0">
                   <span>Efetivo filtrado</span>
-                  <span className="text-[#E5C17B] font-semibold">
+                  <span className="text-[#DFBE78] font-semibold">
                     {simpleSuggestions.length} {simpleSuggestions.length === 1 ? 'militar' : 'militares'}
                   </span>
                 </div>
@@ -425,20 +425,20 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                         onMouseEnter={() => setHighlightedIdx(idx)}
                         className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer ${
                           isHighlighted
-                            ? 'bg-[#2D5A43]/45 text-[#F4E6C4]'
+                            ? 'bg-[#13281E] text-[#F1F5F3]'
                             : !cand.eligibleForScale
-                            ? 'text-[#7D8F85] opacity-75 hover:bg-[#7F1D1D]/18'
-                            : 'text-[#E4EAE6] hover:bg-[#E4EAE6]/[0.06]'
+                            ? 'text-[#6E7E76] opacity-75 hover:bg-[#241214]'
+                            : 'text-[#F1F5F3] hover:bg-[#161D1A]'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span
                             className={`font-mono text-[10px] font-bold w-6 shrink-0 text-center ${
                               rankPosition === 1
-                                ? 'text-[#E5C17B]'
+                                ? 'text-[#DFBE78]'
                                 : rankPosition !== null
-                                ? 'text-[#83B499]'
-                                : 'text-[#697870]'
+                                ? 'text-[#8CC4A7]'
+                                : 'text-[#55665E]'
                             }`}
                           >
                             {rankPosition !== null ? `#${rankPosition}` : '—'}
@@ -448,7 +448,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                               {formatPersonnelDisplay(cand.person)}
                             </div>
                             {(showFullName || cand.person.company) && (
-                              <div className="text-[10px] text-[#7D8F85] truncate">
+                              <div className="text-[10px] text-[#6E7E76] truncate">
                                 {[showFullName ? cand.person.fullName : null, cand.person.company || null]
                                   .filter(Boolean)
                                   .join(' · ')}
@@ -470,22 +470,22 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                               </span>
                             </span>
                           ) : cand.busyOnTargetDate ? (
-                            <span className="text-[10px] font-medium text-[#E5C17B]">
+                            <span className="text-[10px] font-medium text-[#DFBE78]">
                               {cand.busyReason}
                             </span>
                           ) : cand.daysSinceLastDuty === null ? (
-                            <div className="text-[10px] font-semibold text-[#A8D8BE]">
+                            <div className="text-[10px] font-semibold text-[#8CC4A7]">
                               Sem serviço
                             </div>
                           ) : (
                             <div>
-                              <div className="font-mono text-[11px] font-bold text-[#A8D8BE] tabular-nums">
+                              <div className="font-mono text-[11px] font-bold text-[#8CC4A7] tabular-nums">
                                 {cand.daysSinceLastDuty === 0
                                   ? '0d (Dobra)'
                                   : `${cand.daysSinceLastDuty}×1 (${cand.daysSinceLastDuty}d)`}
                               </div>
                               {cand.lastDutyDate && (
-                                <div className="font-mono text-[9px] text-[#7D8F85] tabular-nums">
+                                <div className="font-mono text-[9px] text-[#6E7E76] tabular-nums">
                                   Últ: {formatShortDatePt(cand.lastDutyDate)}
                                 </div>
                               )}
@@ -511,8 +511,8 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                         onMouseEnter={() => setHighlightedIdx(idx)}
                         className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 text-xs transition-colors cursor-pointer ${
                           isHighlighted
-                            ? 'bg-[#2D5A43]/45 text-[#F4E6C4]'
-                            : 'text-[#E4EAE6] hover:bg-[#E4EAE6]/[0.06]'
+                            ? 'bg-[#13281E] text-[#F1F5F3]'
+                            : 'text-[#F1F5F3] hover:bg-[#161D1A]'
                         }`}
                       >
                         <div className="min-w-0">
@@ -521,7 +521,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                           </div>
                           {(person.fullName.toUpperCase() !== person.warName.toUpperCase() ||
                             person.company) && (
-                            <div className="text-[11px] text-[#98A89F] truncate">
+                            <div className="text-[11px] text-[#A4B3AB] truncate">
                               {[
                                 person.fullName.toUpperCase() !== person.warName.toUpperCase()
                                   ? person.fullName
@@ -533,13 +533,13 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                             </div>
                           )}
                         </div>
-                        <UserCheck className="w-3.5 h-3.5 text-[#83B499] shrink-0 opacity-80" />
+                        <UserCheck className="w-3.5 h-3.5 text-[#8CC4A7] shrink-0" />
                       </button>
                     );
                   })}
 
               {restOrderContext && restCandidates.length === 0 && (
-                <div className="px-3 py-3 text-xs text-[#98A89F] text-center space-y-2">
+                <div className="px-3 py-3 text-xs text-[#A4B3AB] text-center space-y-2">
                   <div>Nenhum militar encontrado em {selectedRankFilter === 'all' ? 'todo o efetivo' : selectedRankFilter}.</div>
                   {allRanksFallbackCount > 0 && (
                     <button
@@ -548,7 +548,7 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                         e.preventDefault();
                         setSelectedRankFilter('all');
                       }}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#C8A461]/20 hover:bg-[#C8A461]/30 border border-[#C8A461]/45 text-[#F4E6C4] text-[11px] font-medium cursor-pointer transition-colors"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#1C1810] hover:bg-[#252014] border border-[#63512C] text-[#DFBE78] text-[11px] font-medium cursor-pointer transition-colors"
                     >
                       <span>Ver em todas as graduações ({allRanksFallbackCount})</span>
                     </button>
@@ -566,10 +566,10 @@ export const PersonnelAutocompleteInput: React.FC<PersonnelAutocompleteInputProp
                     void handleCreate();
                   }}
                   onMouseEnter={() => setHighlightedIdx(displayedPeople.length)}
-                  className={`w-full px-3 py-2.5 text-left flex items-center gap-2 text-xs border-t border-[#EBE0C8]/10 transition-colors cursor-pointer ${
+                  className={`w-full px-3 py-2.5 text-left flex items-center gap-2 text-xs border-t border-[#1F2924] transition-colors cursor-pointer ${
                     highlightedIdx === displayedPeople.length
-                      ? 'bg-[#C8A461]/22 text-[#F4E6C4]'
-                      : 'text-[#E5C17B] hover:bg-[#C8A461]/14'
+                      ? 'bg-[#1C1810] text-[#F1F5F3]'
+                      : 'text-[#DFBE78] hover:bg-[#1C1810]'
                   }`}
                 >
                   <Plus className="w-3.5 h-3.5 shrink-0" />

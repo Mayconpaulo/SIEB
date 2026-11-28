@@ -27,33 +27,33 @@ export const DutySwapDetailModal: React.FC<DutySwapDetailModalProps> = ({ detail
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={TRANSITION_MICRO}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="swap-detail-title"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            initial={{ opacity: 0, scale: 0.98, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            exit={{ opacity: 0, scale: 0.98, y: 4 }}
             transition={SPRING_MODAL}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md btl-modal overflow-hidden"
           >
-            <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#38BDF8]/30 flex items-center justify-between gap-3">
+            <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#075985]/35 border border-[#38BDF8]/45 text-[#7DD3FC] shrink-0">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#102431] border border-[#275776] text-[#7DD3FC] shrink-0">
                   <ArrowLeftRight className="w-4 h-4" />
                 </span>
                 <div className="min-w-0">
                   <h3
                     id="swap-detail-title"
-                    className="font-display text-base font-semibold text-[#F4E6C4] truncate"
+                    className="font-display text-base font-semibold text-[#F1F5F3] truncate"
                   >
                     Troca de Serviço
                   </h3>
-                  <p className="text-xs text-[#98A89F] truncate">
+                  <p className="text-xs text-[#A4B3AB] truncate">
                     {detail.scheduleName} · {detail.columnLabel}
                   </p>
                 </div>
@@ -61,7 +61,7 @@ export const DutySwapDetailModal: React.FC<DutySwapDetailModalProps> = ({ detail
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 text-[#98A89F] hover:text-[#F4E6C4] rounded-lg cursor-pointer"
+                className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] rounded-lg cursor-pointer"
                 aria-label="Fechar detalhes da troca"
               >
                 <X className="w-4 h-4" />
@@ -70,22 +70,22 @@ export const DutySwapDetailModal: React.FC<DutySwapDetailModalProps> = ({ detail
 
             <div className="p-6 space-y-4">
               <div className="flex items-center gap-2 text-xs text-[#C8D4CD] font-mono tabular-nums">
-                <CalendarDays className="w-4 h-4 text-[#E5C17B] shrink-0" />
+                <CalendarDays className="w-4 h-4 text-[#DFBE78] shrink-0" />
                 <span>{formatFullDatePt(detail.date)}</span>
               </div>
 
               <div className="space-y-3">
-                <div className="p-3.5 rounded-xl bg-[#2D5A43]/22 border border-[#83B499]/35 space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#A8D8BE]">
+                <div className="p-3.5 rounded-lg bg-[#13281E] border border-[#2D6248] space-y-1">
+                  <div className="text-xs font-medium text-[#8CC4A7]">
                     Deveria estar escalado (conta na escala)
                   </div>
-                  <div className="text-base font-bold text-[#F4E6C4]">
+                  <div className="text-base font-bold text-[#F1F5F3]">
                     {detail.scheduledLabel}
                   </div>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-[#075985]/26 border border-[#38BDF8]/45 space-y-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7DD3FC]">
+                <div className="p-3.5 rounded-lg bg-[#102431] border border-[#275776] space-y-1">
+                  <div className="text-xs font-medium text-[#7DD3FC]">
                     Ficou no lugar (troca)
                   </div>
                   <div className="text-base font-bold text-[#E0F2FE]">
@@ -94,18 +94,18 @@ export const DutySwapDetailModal: React.FC<DutySwapDetailModalProps> = ({ detail
                 </div>
               </div>
 
-              <div className="flex items-start gap-2 text-xs text-[#98A89F] leading-relaxed pt-1">
-                <ShieldCheck className="w-4 h-4 text-[#C8A461] shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 text-xs text-[#A4B3AB] leading-relaxed pt-1">
+                <ShieldCheck className="w-4 h-4 text-[#C8A45D] shrink-0 mt-0.5" />
                 <span>
                   Este serviço conta exclusivamente na escala e na folga de{' '}
-                  <strong className="text-[#F4E6C4]">{detail.scheduledLabel}</strong>, sem
+                  <strong className="text-[#F1F5F3]">{detail.scheduledLabel}</strong>, sem
                   alterar a folga de{' '}
                   <strong className="text-[#7DD3FC]">{detail.substituteLabel}</strong>.
                 </span>
               </div>
             </div>
 
-            <div className="px-6 py-3.5 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end">
+            <div className="px-6 py-3.5 bg-[#0D1210] border-t border-[#1F2924] flex justify-end">
               <button
                 type="button"
                 onClick={onClose}
@@ -159,8 +159,8 @@ export const DutyAssignmentBadge: React.FC<DutyAssignmentBadgeProps> = ({
           onInspectSwap?.(parsed.scheduledLabel, subLabel);
         }}
         title={`Troca de serviço (escalado: ${parsed.scheduledLabel}) — clique para detalhes`}
-        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-left font-semibold text-[#7DD3FC] bg-[#075985]/28 border-[#38BDF8]/48 hover:bg-[#075985]/45 hover:border-[#7DD3FC]/75 transition-colors cursor-pointer ${
-          isMatch ? 'ring-2 ring-[#E5C17B]/70' : ''
+        className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-left font-semibold text-[#7DD3FC] bg-[#102431] border-[#275776] hover:bg-[#153143] hover:border-[#38BDF8] transition-colors cursor-pointer ${
+          isMatch ? 'ring-2 ring-[#DFBE78]' : ''
         }`}
       >
         <ArrowLeftRight className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
@@ -170,11 +170,11 @@ export const DutyAssignmentBadge: React.FC<DutyAssignmentBadgeProps> = ({
   }
 
   const highlightClass = isMatch
-    ? 'bg-[#C8A461]/30 text-[#F4E6C4] ring-1 ring-[#E5C17B]/40 px-1.5 py-0.5 -mx-1 rounded'
+    ? 'bg-[#2C2415] text-[#F1F5F3] ring-1 ring-[#C8A45D] px-1.5 py-0.5 -mx-1 rounded'
     : '';
 
   return (
-    <span className={`font-semibold text-[#E4EAE6] ${highlightClass}`}>
+    <span className={`font-semibold text-[#F1F5F3] ${highlightClass}`}>
       {parsed.scheduledLabel}
     </span>
   );

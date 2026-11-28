@@ -1099,12 +1099,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       {/* Admin Header Strip */}
       <div className="btl-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="text-xs text-[#A8D8BE] font-semibold">
+          <div className="text-xs text-[#8CC4A7] font-semibold">
             {currentAdmin
               ? `Sessão Ativa · ${currentAdmin.displayName} (@${currentAdmin.username})`
               : 'Sessão Administrativa Ativa'}
           </div>
-          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F4E6C4]">
+          <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F1F5F3]">
             Painel Administrativo
           </h1>
         </div>
@@ -1119,17 +1119,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   type="button"
                   onClick={() => setActiveTab(id)}
                   className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
-                    active ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                    active ? 'text-[#F1F5F3]' : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
                   }`}
                 >
                   {active && (
                     <motion.span
                       layoutId="admin-active-tab"
                       transition={SPRING_TAB}
-                      className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/22 to-[#2D5A43]/34 border border-[#C8A461]/45 shadow-[inset_0_1px_0_rgba(255,250,236,0.22)]"
+                      className="absolute inset-0 rounded-lg bg-[#1C2521] border border-[#63512C]"
                     />
                   )}
-                  <Icon className="w-4 h-4 relative z-10" />
+                  <Icon className={`w-4 h-4 relative z-10 ${active ? 'text-[#DFBE78]' : ''}`} />
                   <span className="relative z-10">{label}</span>
                 </button>
               );
@@ -1140,14 +1140,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* First-Time Cloud Sync Banner (only shown if Firestore schedules collection is still empty) */}
       {!isCloudSynced && (
-        <div className="btl-panel border-[#83B499]/35 bg-[#12261C]/65 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="rounded-xl border border-[#2D6248] bg-[#13281E] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h2 className="text-sm font-semibold text-[#F4E6C4]">
+            <h2 className="text-sm font-semibold text-[#F1F5F3]">
               Inicializar Banco de Dados Online com as {INITIAL_SCHEDULES.length} Estruturas Base
             </h2>
             <p className="text-xs text-[#C8D4CD] leading-relaxed max-w-2xl">
               As {INITIAL_SCHEDULES.length} planilhas do batalhão (estrutura de colunas e datas de{' '}
-              <strong className="text-[#E5C17B]">01 nov – 01 dez</strong>, sem nomes preenchidos) ainda não foram gravadas no banco online. Publique-as agora para habilitar edição e sincronização em tempo real.
+              <strong className="text-[#DFBE78]">01 nov – 01 dez</strong>, sem nomes preenchidos) ainda não foram gravadas no banco online. Publique-as agora para habilitar edição e sincronização em tempo real.
             </p>
           </div>
           <button
@@ -1171,10 +1171,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             exit={{ opacity: 0, y: -6 }}
             transition={TRANSITION_MICRO}
             role="status"
-            className={`flex items-start justify-between gap-3 px-4 py-3.5 rounded-xl border text-sm backdrop-blur-md ${
+            className={`flex items-start justify-between gap-3 px-4 py-3.5 rounded-xl border text-sm ${
               feedback.type === 'success'
-                ? 'bg-[#2D5A43]/26 border-[#83B499]/35 text-[#A8D8BE]'
-                : 'bg-[#7F1D1D]/26 border-[#F87171]/35 text-[#FECACA]'
+                ? 'bg-[#13281E] border-[#2D6248] text-[#8CC4A7]'
+                : 'bg-[#241214] border-[#5A262B] text-[#FECACA]'
             }`}
           >
             <div className="flex items-start gap-2.5">
@@ -1235,7 +1235,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onClick={() => setShowPeriodModal(true)}
                   className="btl-btn btl-btn-secondary min-h-[40px] px-3.5 py-1.5 text-xs sm:text-sm"
                 >
-                  <CalendarPlus className="w-4 h-4 text-[#E5C17B]" />
+                  <CalendarPlus className="w-4 h-4 text-[#DFBE78]" />
                   <span>Criar novo período</span>
                 </button>
               </div>
@@ -1279,10 +1279,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
                 <FileSpreadsheet
                   className={`w-4 h-4 shrink-0 ${
-                    googleAccessToken ? 'text-[#83B499]' : 'text-[#C8A461]'
+                    googleAccessToken ? 'text-[#8CC4A7]' : 'text-[#C8A45D]'
                   }`}
                 />
-                <span className="font-semibold text-[#F4E6C4]">
+                <span className="font-semibold text-[#F1F5F3]">
                   {googleAccessToken
                     ? 'Planilha Google vinculada (sincronização ativa ao publicar)'
                     : 'Planilha Google de backup'}
@@ -1291,7 +1291,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   href={BACKUP_SPREADSHEET_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[#E5C17B] hover:text-[#F4E6C4] hover:underline"
+                  className="inline-flex items-center gap-1 text-[#DFBE78] hover:text-[#F1F5F3] hover:underline"
                 >
                   <span>Abrir planilha</span>
                   <ExternalLink className="w-3 h-3" />
@@ -1306,7 +1306,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onClick={handleRequestFullGoogleSheetsSync}
                     className="btl-btn btl-btn-secondary min-h-[36px] px-3 py-1.5 text-xs"
                   >
-                    <RefreshCw className="w-3.5 h-3.5 text-[#A8D8BE]" />
+                    <RefreshCw className="w-3.5 h-3.5 text-[#8CC4A7]" />
                     <span>Sincronizar tudo agora</span>
                   </button>
                 ) : (
@@ -1314,7 +1314,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="button"
                     disabled={connectingGoogleSheets || Boolean(busyMessage)}
                     onClick={() => void handleConnectGoogleSheets()}
-                    className="min-h-[36px] px-3.5 py-1.5 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-xs inline-flex items-center gap-2 border border-[#DADCE0] shadow-sm transition-colors cursor-pointer"
+                    className="min-h-[36px] px-3.5 py-1.5 rounded-lg bg-[#F1F5F3] text-[#0A0D0C] hover:bg-white disabled:opacity-60 font-semibold text-xs inline-flex items-center gap-2 border border-[#D4DDD8] transition-colors cursor-pointer"
                   >
                     <GoogleMiniIcon className="w-4 h-4 shrink-0" />
                     <span>
@@ -1329,17 +1329,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="overflow-x-auto schedule-scroll">
                 <table className="w-full border-collapse text-left">
                   <thead>
-                    <tr className="bg-[#0B120E] text-[#F4E6C4] border-b border-[#C9A961]/25">
-                      <th className="sticky left-0 z-20 bg-[#0B120E] px-3.5 py-3.5 text-xs font-semibold border-r border-[#EBE0C8]/15 whitespace-nowrap min-w-[168px]">
+                    <tr className="bg-[#161D1A] text-[#F1F5F3] border-b border-[#28352F]">
+                      <th className="sticky left-0 z-20 bg-[#161D1A] px-3.5 py-3.5 text-xs font-semibold border-r border-[#28352F] whitespace-nowrap min-w-[168px]">
                         Data / Dia
                       </th>
-                      <th className="px-3 py-3.5 text-xs font-semibold border-r border-[#EBE0C8]/10 whitespace-nowrap min-w-[138px]">
+                      <th className="px-3 py-3.5 text-xs font-semibold border-r border-[#1F2924] whitespace-nowrap min-w-[138px]">
                         Vermelha / Feriado
                       </th>
                       {selectedSchedule.columns.map((col) => (
                         <th
                           key={col.id}
-                          className="px-3 py-3.5 text-xs font-semibold border-r border-[#EBE0C8]/10 whitespace-nowrap min-w-[180px]"
+                          className="px-3 py-3.5 text-xs font-semibold border-r border-[#1F2924] whitespace-nowrap min-w-[180px]"
                         >
                           {col.label}
                         </th>
@@ -1349,7 +1349,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
+                  <tbody className="divide-y divide-[#1C2521] text-sm">
                     {draftEntries.map((entry) => {
                       const isDirty = modifiedDatesSet.has(entry.date);
                       return (
@@ -1357,19 +1357,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           key={entry.date}
                           className={
                             isDirty
-                              ? 'bg-[#C8A461]/14'
+                              ? 'bg-[#1C1810]'
                               : entry.isRedScale
-                              ? 'bg-[#7F1D1D]/18'
-                              : 'bg-transparent hover:bg-[#E4EAE6]/[0.03]'
+                              ? 'bg-[#221214]/70'
+                              : 'bg-transparent hover:bg-[#161D1A]'
                           }
                         >
                           <td
-                            className={`sticky left-0 z-10 px-3.5 py-2 border-r border-[#EBE0C8]/12 whitespace-nowrap ${
+                            className={`sticky left-0 z-10 px-3.5 py-2 border-r border-[#28352F] whitespace-nowrap ${
                               isDirty
-                                ? 'bg-[#241E12]'
+                                ? 'bg-[#1C1810]'
                                 : entry.isRedScale
-                                ? 'bg-[#231012]'
-                                : 'bg-[#0C1310]'
+                                ? 'bg-[#221214]'
+                                : 'bg-[#111614]'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-2">
@@ -1378,8 +1378,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   entry.isRedScale
                                     ? 'text-[#FCA5A5]'
                                     : isDirty
-                                    ? 'text-[#E5C17B]'
-                                    : 'text-[#E4EAE6]'
+                                    ? 'text-[#DFBE78]'
+                                    : 'text-[#F1F5F3]'
                                 }`}
                               >
                                 {formatShortDatePt(entry.date)} ({entry.dayOfWeek})
@@ -1391,7 +1391,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   setRenamingEntry(entry);
                                   setNewDateValue(entry.date);
                                 }}
-                                className="p-1.5 text-[#98A89F] hover:text-[#F4E6C4] rounded transition-colors cursor-pointer"
+                                className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] rounded transition-colors cursor-pointer"
                                 aria-label={`Alterar data ${entry.date}`}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -1399,7 +1399,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
                           </td>
 
-                          <td className="px-3 py-2 border-r border-[#EBE0C8]/8 whitespace-nowrap">
+                          <td className="px-3 py-2 border-r border-[#1C2521] whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <input
                                 type="checkbox"
@@ -1418,7 +1418,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   updateDraftMeta(entry.date, { holidayLabel: e.target.value })
                                 }
                                 placeholder="Feriado..."
-                                className="w-24 px-2 py-1 text-xs text-[#E4EAE6] placeholder:text-[#697870] bg-[#080B09]/70 border border-[#EBE0C8]/15 rounded-md focus:outline-none focus:border-[#C8A461]"
+                                className="w-24 px-2 py-1 text-xs text-[#F1F5F3] placeholder:text-[#55665E] bg-[#0D1210] border border-[#28352F] rounded-md focus:outline-none focus:border-[#C8A45D]"
                               />
                             </div>
                           </td>
@@ -1440,14 +1440,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             return (
                               <td
                                 key={col.id}
-                                className="px-2 py-1.5 border-r border-[#EBE0C8]/8"
+                                className="px-2 py-1.5 border-r border-[#1C2521]"
                               >
                                 {parsedCell.isSwap && parsedCell.substituteLabel ? (
                                   <button
                                     type="button"
                                     onClick={openSwapModal}
                                     title={`Troca: ficou ${parsedCell.substituteLabel} no lugar de ${parsedCell.scheduledLabel} (clique para editar)`}
-                                    className="w-full min-h-[36px] px-2.5 py-1 rounded-md border border-[#38BDF8]/55 bg-[#075985]/26 hover:bg-[#075985]/40 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer"
+                                    className="w-full min-h-[36px] px-2.5 py-1 rounded-md border border-[#275776] bg-[#102431] hover:bg-[#153042] text-left flex items-center justify-between gap-2 transition-colors cursor-pointer"
                                   >
                                     <div className="min-w-0">
                                       <div className="text-xs font-semibold text-[#7DD3FC] truncate flex items-center gap-1">
@@ -1456,11 +1456,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                           {parsedCell.substituteLabel}
                                         </span>
                                       </div>
-                                      <div className="text-[10px] text-[#98A89F] truncate">
+                                      <div className="text-[10px] text-[#A4B3AB] truncate">
                                         Esc: {parsedCell.scheduledLabel}
                                       </div>
                                     </div>
-                                    <Pencil className="w-3 h-3 text-[#7DD3FC]/80 shrink-0" />
+                                    <Pencil className="w-3 h-3 text-[#7DD3FC] shrink-0" />
                                   </button>
                                 ) : (
                                   <div className="flex items-center gap-1">
@@ -1506,8 +1506,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                       aria-label={`Troca de serviço em ${col.label} dia ${entry.date}`}
                                       className={`min-w-[30px] min-h-[30px] rounded-md border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
                                         parsedCell.scheduledLabel
-                                          ? 'bg-[#075985]/20 border-[#38BDF8]/35 text-[#7DD3FC] hover:bg-[#075985]/40 hover:border-[#7DD3FC]/60'
-                                          : 'bg-transparent border-transparent text-[#4F6056] hover:text-[#98A89F] hover:border-[#EBE0C8]/18'
+                                          ? 'bg-[#102431] border-[#275776] text-[#7DD3FC] hover:bg-[#153042]'
+                                          : 'bg-transparent border-transparent text-[#55665E] hover:text-[#A4B3AB] hover:border-[#28352F]'
                                       }`}
                                     >
                                       <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -1540,7 +1540,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   },
                                 })
                               }
-                              className="p-2 text-[#FCA5A5] hover:bg-[#7F1D1D]/35 disabled:opacity-35 rounded-lg transition-colors cursor-pointer"
+                              className="p-2 text-[#FCA5A5] hover:bg-[#241214] disabled:opacity-35 rounded-lg transition-colors cursor-pointer"
                               aria-label={`Excluir registro ${entry.date}`}
                             >
                               <Trash2 className="w-4 h-4" />
@@ -1636,7 +1636,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             className="space-y-4"
           >
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h2 className="font-display text-lg font-semibold text-[#F4E6C4]">
+              <h2 className="font-display text-lg font-semibold text-[#F1F5F3]">
                 Modelos de Escala ({schedules.length})
               </h2>
               <div className="flex flex-wrap items-center gap-2">
@@ -1671,29 +1671,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     className="btl-home-card p-5 flex flex-col justify-between gap-4"
                   >
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between gap-2 text-xs text-[#98A89F] font-mono tabular-nums">
-                        <span className="text-[#E5C17B] font-semibold">
+                      <div className="flex items-center justify-between gap-2 text-xs text-[#A4B3AB] font-mono tabular-nums">
+                        <span className="text-[#DFBE78] font-semibold">
                           Ordem #{model.order}
                         </span>
                         <span>
                           {model.columns.length} colunas · {count} dias
                         </span>
                       </div>
-                      <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                      <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                         {model.name}
                       </h3>
-                      <div className="pt-2.5 border-t border-[#EBE0C8]/10 text-xs text-[#C8D4CD] leading-relaxed">
+                      <div className="pt-2.5 border-t border-[#1F2924] text-xs text-[#C8D4CD] leading-relaxed">
                         {model.columns.map((c) => c.label).join(' · ')}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#EBE0C8]/10">
+                    <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#1F2924]">
                       <button
                         type="button"
                         onClick={() => openEditModelModal(model)}
                         className="btl-btn btl-btn-secondary min-h-[38px] px-3.5 py-1.5 text-xs"
                       >
-                        <Pencil className="w-3.5 h-3.5 text-[#E5C17B]" />
+                        <Pencil className="w-3.5 h-3.5 text-[#DFBE78]" />
                         <span>Editar modelo e colunas</span>
                       </button>
 
@@ -1771,54 +1771,54 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               className="w-full max-w-2xl btl-modal overflow-hidden max-h-[85vh] flex flex-col"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
                 <div>
-                  <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                  <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                     Pré-visualização das Alterações
                   </h3>
-                  <p className="text-xs text-[#98A89F]">
+                  <p className="text-xs text-[#A4B3AB]">
                     {selectedSchedule.name} · {pendingDiffs.length} alteração(ões) pronta(s) para publicar
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowPreviewModal(false)}
-                  className="p-1.5 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="p-5 overflow-y-auto flex-1 divide-y divide-[#EBE0C8]/10">
+              <div className="p-5 overflow-y-auto flex-1 divide-y divide-[#1C2521]">
                 {pendingDiffs.map((diff, i) => (
                   <div
                     key={`${diff.date}-${diff.fieldLabel}-${i}`}
                     className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm"
                   >
                     <div>
-                      <span className="font-mono text-xs font-semibold text-[#F4E6C4] tabular-nums">
+                      <span className="font-mono text-xs font-semibold text-[#DFBE78] tabular-nums">
                         {formatShortDatePt(diff.date)}
                       </span>
-                      <span className="mx-2 text-[#697870]">·</span>
-                      <span className="text-xs font-medium text-[#98A89F]">{diff.fieldLabel}</span>
+                      <span className="mx-2 text-[#4B5A53]">·</span>
+                      <span className="text-xs font-medium text-[#A4B3AB]">{diff.fieldLabel}</span>
                     </div>
                     <div className="flex items-center gap-2 text-xs sm:text-sm">
                       <span className="text-[#FCA5A5] line-through">
                         {formatDiffDisplayValue(diff.before)}
                       </span>
-                      <span className="text-[#697870]">→</span>
-                      <span className="font-semibold text-[#A8D8BE]">
+                      <span className="text-[#4B5A53]">→</span>
+                      <span className="font-semibold text-[#8CC4A7]">
                         {formatDiffDisplayValue(diff.after)}
                       </span>
                     </div>
@@ -1827,14 +1827,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Explicit Google Sheets Sync Confirmation Block */}
-              <div className="px-6 py-3.5 bg-[#0A120E] border-t border-[#EBE0C8]/12 space-y-2">
+              <div className="px-6 py-3.5 bg-[#0D1210] border-t border-[#1F2924] space-y-2">
                 {googleAccessToken ? (
                   <label className="flex items-start gap-2.5 text-xs text-[#C8D4CD] cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={syncGoogleSheetsOnSave}
                       onChange={(e) => setSyncGoogleSheetsOnSave(e.target.checked)}
-                      className="mt-0.5 accent-[#83B499]"
+                      className="mt-0.5 accent-[#8CC4A7]"
                     />
                     <span className="leading-relaxed">
                       Atualizar também a{' '}
@@ -1843,7 +1843,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="text-[#E5C17B] hover:underline font-medium"
+                        className="text-[#DFBE78] hover:underline font-medium"
                       >
                         planilha do Google Sheets vinculada
                       </a>{' '}
@@ -1853,7 +1853,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </label>
                 ) : (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
-                    <span className="text-[#98A89F]">
+                    <span className="text-[#A4B3AB]">
                       Conecte sua conta Google para enviar estas alterações automaticamente para a
                       planilha de backup.
                     </span>
@@ -1861,7 +1861,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       type="button"
                       disabled={connectingGoogleSheets}
                       onClick={() => void handleConnectGoogleSheets()}
-                      className="min-h-[34px] px-3 py-1 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-xs inline-flex items-center gap-2 border border-[#DADCE0] shrink-0 cursor-pointer"
+                      className="min-h-[34px] px-3 py-1 rounded-lg bg-[#F1F5F3] text-[#0A0D0C] hover:bg-white disabled:opacity-60 font-semibold text-xs inline-flex items-center gap-2 border border-[#D4DDD8] shrink-0 cursor-pointer"
                     >
                       <GoogleMiniIcon className="w-3.5 h-3.5 shrink-0" />
                       <span>
@@ -1872,7 +1872,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex items-center justify-end gap-3">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowPreviewModal(false)}
@@ -1903,35 +1903,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onSubmit={handleCreatePeriod}
               className="w-full max-w-md btl-modal overflow-hidden"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   Criar Novo Período
                 </h3>
                 <button
                   type="button"
                   onClick={() => setShowPeriodModal(false)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="p-6 space-y-4">
-                <p className="text-xs text-[#98A89F] leading-relaxed">
+                <p className="text-xs text-[#A4B3AB] leading-relaxed">
                   As novas datas serão adicionadas à escala{' '}
-                  <strong className="text-[#E5C17B]">{selectedSchedule.name}</strong> sem sobrescrever dias já existentes. Sábados e domingos já vêm marcados como escala vermelha.
+                  <strong className="text-[#DFBE78]">{selectedSchedule.name}</strong> sem sobrescrever dias já existentes. Sábados e domingos já vêm marcados como escala vermelha.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1958,7 +1958,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowPeriodModal(false)}
@@ -1987,34 +1987,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onSubmit={handleConfirmRenameDate}
               className="w-full max-w-sm btl-modal overflow-hidden"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   Alterar Data do Registro
                 </h3>
                 <button
                   type="button"
                   onClick={() => setRenamingEntry(null)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="p-6 space-y-4">
-                <p className="text-xs text-[#98A89F]">
+                <p className="text-xs text-[#A4B3AB]">
                   Data atual:{' '}
-                  <strong className="font-mono text-[#E5C17B]">
+                  <strong className="font-mono text-[#DFBE78]">
                     {formatFullDatePt(renamingEntry.date)}
                   </strong>
                 </p>
@@ -2029,7 +2029,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   />
                 </label>
               </div>
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setRenamingEntry(null)}
@@ -2058,20 +2058,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onSubmit={handleSaveModel}
               className="w-full max-w-2xl btl-modal overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   {editingModel.mode === 'create'
                     ? 'Cadastrar Novo Modelo de Escala'
                     : 'Editar Modelo e Colunas da Escala'}
@@ -2079,7 +2079,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingModel(null)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -2163,7 +2163,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           ],
                         })
                       }
-                      className="inline-flex items-center gap-1 text-xs font-medium text-[#E5C17B] hover:text-[#F4E6C4] hover:underline disabled:opacity-40 cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[#DFBE78] hover:text-[#F1F5F3] hover:underline disabled:opacity-40 cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Adicionar coluna</span>
@@ -2208,7 +2208,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
                             setEditingModel({ ...editingModel, columns: next });
                           }}
-                          className="p-2 text-[#98A89F] hover:text-[#F4E6C4] disabled:opacity-30 cursor-pointer"
+                          className="p-2 text-[#A4B3AB] hover:text-[#F1F5F3] disabled:opacity-30 cursor-pointer"
                           aria-label="Mover para cima"
                         >
                           <ArrowUp className="w-4 h-4" />
@@ -2221,7 +2221,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             [next[idx + 1], next[idx]] = [next[idx], next[idx + 1]];
                             setEditingModel({ ...editingModel, columns: next });
                           }}
-                          className="p-2 text-[#98A89F] hover:text-[#F4E6C4] disabled:opacity-30 cursor-pointer"
+                          className="p-2 text-[#A4B3AB] hover:text-[#F1F5F3] disabled:opacity-30 cursor-pointer"
                           aria-label="Mover para baixo"
                         >
                           <ArrowDown className="w-4 h-4" />
@@ -2235,7 +2235,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               columns: editingModel.columns.filter((_, i) => i !== idx),
                             })
                           }
-                          className="p-2 text-[#FCA5A5] hover:bg-[#7F1D1D]/35 disabled:opacity-30 rounded-lg cursor-pointer"
+                          className="p-2 text-[#FCA5A5] hover:bg-[#241214] disabled:opacity-30 rounded-lg cursor-pointer"
                           aria-label="Remover coluna"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2246,7 +2246,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 {editingModel.mode === 'create' && (
-                  <div className="pt-3 border-t border-[#EBE0C8]/10 space-y-2">
+                  <div className="pt-3 border-t border-[#1F2924] space-y-2">
                     <span className="text-xs font-semibold text-[#C8D4CD]">
                       Período inicial de datas (opcional)
                     </span>
@@ -2272,7 +2272,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditingModel(null)}
@@ -2301,21 +2301,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               className="w-full max-w-md btl-modal p-6 space-y-4"
             >
-              <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                 {confirmAction.title}
               </h3>
-              <p className="text-sm text-[#98A89F] leading-relaxed">{confirmAction.description}</p>
+              <p className="text-sm text-[#A4B3AB] leading-relaxed">{confirmAction.description}</p>
               <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
                   type="button"
@@ -2360,15 +2360,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
             onClick={() => setEditingSwapCell(null)}
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onClick={(e) => e.stopPropagation()}
               onSubmit={(e) => {
@@ -2388,16 +2388,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               }}
               className="w-full max-w-md btl-modal overflow-hidden"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#38BDF8]/25 flex items-center justify-between gap-3">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#275776] flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#075985]/35 border border-[#38BDF8]/45 text-[#7DD3FC] shrink-0">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#102431] border border-[#275776] text-[#7DD3FC] shrink-0">
                     <ArrowLeftRight className="w-4 h-4" />
                   </span>
                   <div className="min-w-0">
-                    <h3 className="font-display text-base font-semibold text-[#F4E6C4] truncate">
+                    <h3 className="font-display text-base font-semibold text-[#F1F5F3] truncate">
                       Escalação e Troca
                     </h3>
-                    <p className="text-xs text-[#98A89F] truncate">
+                    <p className="text-xs text-[#A4B3AB] truncate">
                       {editingSwapCell.colLabel} · {formatFullDatePt(editingSwapCell.date)}
                     </p>
                   </div>
@@ -2405,7 +2405,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingSwapCell(null)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -2413,7 +2413,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div className="p-6 space-y-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-[#A8D8BE]">
+                  <label className="block text-xs font-semibold text-[#8CC4A7]">
                     1. Militar escalado (conta na escala e na folga)
                   </label>
                   <PersonnelAutocompleteInput
@@ -2456,10 +2456,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         substituteValue: '',
                       })
                     }
-                    className={`px-3 py-2.5 rounded-xl border text-xs font-semibold text-center transition-colors cursor-pointer ${
+                    className={`px-3 py-2.5 rounded-lg border text-xs font-semibold text-center transition-colors cursor-pointer ${
                       !editingSwapCell.hasSwap
-                        ? 'bg-[#2D5A43]/35 border-[#83B499]/60 text-[#F4E6C4]'
-                        : 'bg-[#090F0C]/70 border-[#EBE0C8]/12 text-[#98A89F] hover:text-[#E4EAE6]'
+                        ? 'bg-[#13281E] border-[#2D6248] text-[#F1F5F3]'
+                        : 'bg-[#0D1210] border-[#1F2924] text-[#A4B3AB] hover:text-[#F1F5F3]'
                     }`}
                   >
                     Sem troca (Escalado)
@@ -2467,10 +2467,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <button
                     type="button"
                     onClick={() => setEditingSwapCell({ ...editingSwapCell, hasSwap: true })}
-                    className={`px-3 py-2.5 rounded-xl border text-xs font-semibold text-center inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                    className={`px-3 py-2.5 rounded-lg border text-xs font-semibold text-center inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                       editingSwapCell.hasSwap
-                        ? 'bg-[#075985]/38 border-[#38BDF8]/65 text-[#7DD3FC]'
-                        : 'bg-[#090F0C]/70 border-[#EBE0C8]/12 text-[#98A89F] hover:text-[#E4EAE6]'
+                        ? 'bg-[#102431] border-[#275776] text-[#7DD3FC]'
+                        : 'bg-[#0D1210] border-[#1F2924] text-[#A4B3AB] hover:text-[#F1F5F3]'
                     }`}
                   >
                     <ArrowLeftRight className="w-3.5 h-3.5" />
@@ -2479,7 +2479,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 {editingSwapCell.hasSwap && (
-                  <div className="space-y-2 p-3.5 rounded-xl bg-[#075985]/16 border border-[#38BDF8]/35">
+                  <div className="space-y-2 p-3.5 rounded-lg bg-[#102431] border border-[#275776]">
                     <label className="block text-xs font-semibold text-[#7DD3FC]">
                       2. Quem ficou no lugar (não conta na escala deste militar)
                     </label>
@@ -2499,13 +2499,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onQuickCreate={handleQuickCreateFromCell}
                       placeholder="Digite o nome de quem ficou no lugar..."
                     />
-                    <p className="text-[11px] text-[#98A89F] leading-relaxed">
+                    <p className="text-[11px] text-[#A4B3AB] leading-relaxed">
                       Na escala pública aparecerá{' '}
                       <span className="text-[#7DD3FC] font-semibold">
                         {editingSwapCell.substituteValue.trim() || 'quem ficou no lugar'}
                       </span>{' '}
                       em cor diferenciada (azul). O serviço contará apenas na escala e folga de{' '}
-                      <span className="text-[#F4E6C4] font-semibold">
+                      <span className="text-[#F1F5F3] font-semibold">
                         {editingSwapCell.scheduledValue.trim() || 'quem foi escalado'}
                       </span>
                       .
@@ -2514,7 +2514,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 )}
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex items-center justify-between gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex items-center justify-between gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
@@ -2548,7 +2548,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <button
           type="button"
           onClick={onExitAdmin}
-          className="text-xs font-medium text-[#98A89F] hover:text-[#FCA5A5] underline underline-offset-4 transition-colors cursor-pointer"
+          className="text-xs font-medium text-[#A4B3AB] hover:text-[#FCA5A5] underline underline-offset-4 transition-colors cursor-pointer"
         >
           Encerrar sessão administrativa e voltar para consulta
         </button>

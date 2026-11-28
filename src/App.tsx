@@ -363,10 +363,12 @@ export default function App() {
             </AnimatePresence>
           </main>
 
-          <footer className="hidden md:block border-t border-[#EBE0C8]/10 bg-[#080B09]/65 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-[#7D8F85]">
-              <span className="text-[#98A89F]">
-                <strong className="text-[#F4E6C4] font-semibold">SIEB</strong> · Sistema Integrado de Escalas do Batalhão
+          <footer className="hidden md:block border-t border-[#1F2924] bg-[#0D1210]">
+            <div className="max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-[#6E7E76]">
+              <span className="text-[#A4B3AB]">
+                <strong className="text-[#F1F5F3] font-semibold tracking-wide">SIEB</strong>
+                <span aria-hidden="true" className="mx-2 text-[#374840]">·</span>
+                Sistema Integrado de Escalas do Batalhão
               </span>
             </div>
           </footer>

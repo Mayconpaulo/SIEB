@@ -78,17 +78,17 @@ const BLOCKED_CELL_CLASS =
 function getCellBadgeStyle(code: ActivityCode): string {
   switch (code) {
     case 'P':
-      return 'bg-[#2D5A43]/45 text-[#A8D8BE] border-[#83B499]/42';
+      return 'bg-[#13281E] text-[#8CC4A7] border-[#2D6248]';
     case 'V':
-      return 'bg-[#7F1D1D]/52 text-[#FCA5A5] border-[#F87171]/48';
+      return 'bg-[#241214] text-[#FCA5A5] border-[#5A262B]';
     case 'M':
-      return 'bg-[#C8A461]/28 text-[#F4E6C4] border-[#E5C17B]/48';
+      return 'bg-[#1C1810] text-[#DFBE78] border-[#63512C]';
     case 'R':
-      return 'bg-[#075985]/22 text-[#7DD3FC] border-[#38BDF8]/25';
+      return 'bg-[#102431] text-[#7DD3FC] border-[#275776]';
     case 'X':
-      return `${BLOCKED_CELL_CLASS} text-[#7D8F85] border-[#697870]/45`;
+      return `${BLOCKED_CELL_CLASS} text-[#6E7E76] border-[#28352F]`;
     default:
-      return 'bg-transparent text-[#4F6056] border-transparent';
+      return 'bg-transparent text-[#4B5A53] border-transparent';
   }
 }
 
@@ -346,7 +346,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             'X'
           )} select-none`}
         >
-          <span className="w-2.5 h-0.5 rounded-full bg-[#697870]/75" />
+          <span className="w-2.5 h-0.5 rounded-full bg-[#4B5A53]" />
         </span>
       );
     }
@@ -354,14 +354,14 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       return (
         <span
           title={`Folga · ${cell.restDayNumber}º dia sem serviço`}
-          className="inline-flex items-center justify-center min-w-[26px] h-[26px] px-1.5 rounded-md font-mono text-xs font-semibold tabular-nums text-[#7DD3FC]/90 bg-[#075985]/16 border border-[#38BDF8]/20 select-none"
+          className="inline-flex items-center justify-center min-w-[26px] h-[26px] px-1.5 rounded-md font-mono text-xs font-semibold tabular-nums text-[#7DD3FC] bg-[#102431] border border-[#275776] select-none"
         >
           {cell.restDayNumber}
         </span>
       );
     }
     if (cell.primaryCode === '—') {
-      return <span className="text-[#4F6056] select-none">—</span>;
+      return <span className="text-[#4B5A53] select-none">—</span>;
     }
 
     const label = cell.displayLabel || cell.primaryCode;
@@ -380,7 +380,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
           <span>{label}</span>
         </span>
         {hasMissionOverlay && (
-          <span className="text-[8px] leading-none text-[#F4E6C4] font-semibold mt-0.5">
+          <span className="text-[8px] leading-none text-[#DFBE78] font-semibold mt-0.5">
             +M
           </span>
         )}
@@ -393,18 +393,18 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       {/* Top Heading & Period Mode Switcher */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
+          <h1 className="font-display text-2xl font-bold text-[#F1F5F3]">
             Planilha de Folga · {activeSheetDef.title}
           </h1>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#98A89F] font-mono tabular-nums">
-            <span className="text-[#E5C17B] font-semibold">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-[#A4B3AB] font-mono tabular-nums">
+            <span className="text-[#DFBE78] font-semibold">
               {matrix.rows.length} {matrix.rows.length === 1 ? 'militar' : 'militares'}
             </span>
-            <span aria-hidden="true" className="text-[#697870]">·</span>
+            <span aria-hidden="true" className="text-[#4B5A53]">·</span>
             <span>{matrix.dates.length} dias</span>
             {matrix.dates.length > 0 && (
               <>
-                <span aria-hidden="true" className="text-[#697870]">·</span>
+                <span aria-hidden="true" className="text-[#4B5A53]">·</span>
                 <span>
                   {formatShortDatePt(matrix.dates[0].date)} –{' '}
                   {formatShortDatePt(matrix.dates[matrix.dates.length - 1].date)}
@@ -420,37 +420,37 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
           className="btl-panel px-3.5 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs"
         >
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[10px] font-bold bg-[#2D5A43]/45 text-[#A8D8BE] border-[#83B499]/42">
+            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[10px] font-bold bg-[#13281E] text-[#8CC4A7] border-[#2D6248]">
               SV
             </span>
             <span>Preta</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[10px] font-bold bg-[#7F1D1D]/52 text-[#FCA5A5] border-[#F87171]/48">
+            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[10px] font-bold bg-[#241214] text-[#FCA5A5] border-[#5A262B]">
               SV
             </span>
             <span>Vermelha</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center w-6 h-5 rounded border font-mono text-[11px] font-bold bg-[#C8A461]/28 text-[#F4E6C4] border-[#E5C17B]/48">
+            <span className="inline-flex items-center justify-center w-6 h-5 rounded border font-mono text-[11px] font-bold bg-[#1C1810] text-[#DFBE78] border-[#63512C]">
               M
             </span>
             <span>Missão</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-[#C8D4CD]">
-            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[11px] font-semibold bg-[#075985]/16 text-[#7DD3FC] border-[#38BDF8]/25">
+            <span className="inline-flex items-center justify-center px-1.5 h-5 rounded border font-mono text-[11px] font-semibold bg-[#102431] text-[#7DD3FC] border-[#275776]">
               1 2 3
             </span>
             <span>Folga</span>
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[#98A89F]">
+          <span className="inline-flex items-center gap-1.5 text-[#A4B3AB]">
             <span
-              className={`inline-flex items-center justify-center w-6 h-5 rounded border ${BLOCKED_CELL_CLASS} border-[#697870]/45`}
+              className={`inline-flex items-center justify-center w-6 h-5 rounded border ${BLOCKED_CELL_CLASS} border-[#28352F]`}
             />
             <span>Não concorre</span>
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[#98A89F]">
-            <span className="inline-flex items-center justify-center w-5 h-5 font-mono text-xs font-bold text-[#697870]">
+          <span className="inline-flex items-center gap-1.5 text-[#A4B3AB]">
+            <span className="inline-flex items-center justify-center w-5 h-5 font-mono text-xs font-bold text-[#6E7E76]">
               —
             </span>
             <span>Sem registro</span>
@@ -478,20 +478,20 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 if (sheet.id !== 'all') setRankFilter('all');
               }}
               className={`relative inline-flex items-center gap-1.5 min-h-[38px] px-3 py-1.5 text-xs sm:text-[13px] font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
-                isSelected ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                isSelected ? 'text-[#F1F5F3]' : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
               }`}
             >
               {isSelected && (
                 <motion.span
                   layoutId="matrix-rank-sheet-tab"
                   transition={SPRING_TAB}
-                  className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#C8A461]/24 to-[#2D5A43]/38 border border-[#C8A461]/48 shadow-[inset_0_1px_0_rgba(255,250,236,0.2)]"
+                  className="absolute inset-0 rounded-lg bg-[#1C2521] border border-[#63512C]"
                 />
               )}
               <span className="relative z-10">{sheet.tabLabel}</span>
               <span
                 className={`relative z-10 font-mono text-[10px] tabular-nums ${
-                  isSelected ? 'text-[#E5C17B]' : 'text-[#697870]'
+                  isSelected ? 'text-[#DFBE78]' : 'text-[#6E7E76]'
                 }`}
               >
                 {count}
@@ -511,14 +511,14 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 type="button"
                 onClick={() => setPeriodMode('month')}
                 className={`relative min-h-[36px] px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer ${
-                  periodMode === 'month' ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                  periodMode === 'month' ? 'text-[#F1F5F3]' : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
                 }`}
               >
                 {periodMode === 'month' && (
                   <motion.span
                     layoutId="matrix-period-mode"
                     transition={SPRING_TAB}
-                    className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#2D5A43]/75 to-[#1E3F2E]/85 border border-[#83B499]/40"
+                    className="absolute inset-0 rounded-lg bg-[#24533C] border border-[#367657]"
                   />
                 )}
                 <span className="relative z-10">Mês / Ano</span>
@@ -531,14 +531,14 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                   setPeriodMode('custom');
                 }}
                 className={`relative inline-flex items-center gap-1.5 min-h-[36px] px-3 py-1.5 text-xs font-medium rounded-lg cursor-pointer ${
-                  periodMode === 'custom' ? 'text-[#F4E6C4]' : 'text-[#98A89F] hover:text-[#E4EAE6]'
+                  periodMode === 'custom' ? 'text-[#F1F5F3]' : 'text-[#A4B3AB] hover:text-[#F1F5F3]'
                 }`}
               >
                 {periodMode === 'custom' && (
                   <motion.span
                     layoutId="matrix-period-mode"
                     transition={SPRING_TAB}
-                    className="absolute inset-0 rounded-lg bg-gradient-to-b from-[#2D5A43]/75 to-[#1E3F2E]/85 border border-[#83B499]/40"
+                    className="absolute inset-0 rounded-lg bg-[#24533C] border border-[#367657]"
                   />
                 )}
                 <CalendarRange className="w-3.5 h-3.5 relative z-10" />
@@ -617,8 +617,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
               onClick={() => setMobileDisplay('grid')}
               className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg cursor-pointer ${
                 mobileDisplay === 'grid'
-                  ? 'bg-[#2D5A43]/70 text-[#F4E6C4]'
-                  : 'text-[#98A89F]'
+                  ? 'bg-[#24533C] text-[#F1F5F3]'
+                  : 'text-[#A4B3AB]'
               }`}
             >
               <Table2 className="w-3.5 h-3.5" />
@@ -629,8 +629,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
               onClick={() => setMobileDisplay('cards')}
               className={`inline-flex items-center gap-1.5 min-h-[34px] px-3 py-1 text-xs font-medium rounded-lg cursor-pointer ${
                 mobileDisplay === 'cards'
-                  ? 'bg-[#2D5A43]/70 text-[#F4E6C4]'
-                  : 'text-[#98A89F]'
+                  ? 'bg-[#24533C] text-[#F1F5F3]'
+                  : 'text-[#A4B3AB]'
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
@@ -642,7 +642,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
         {/* Search + Rank + Company Filters */}
         <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
           <div className="relative flex-1 min-w-0">
-            <Search className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-[#C8A45D] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
               value={searchQuery}
@@ -655,7 +655,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#A4B3AB] hover:text-[#F1F5F3] cursor-pointer"
                 aria-label="Limpar pesquisa"
               >
                 <X className="w-4 h-4" />
@@ -700,14 +700,14 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
       {/* Empty State */}
       {matrix.rows.length === 0 ? (
         <div className="btl-card p-10 text-center space-y-2">
-          <User className="w-6 h-6 text-[#C8A461] mx-auto" />
-          <p className="text-sm font-semibold text-[#F4E6C4]">
+          <User className="w-6 h-6 text-[#C8A45D] mx-auto" />
+          <p className="text-sm font-semibold text-[#F1F5F3]">
             {personnel.length === 0
               ? 'Nenhum militar cadastrado no efetivo ainda'
               : 'Nenhum militar encontrado para os filtros aplicados'}
           </p>
           {personnel.length === 0 && (
-            <p className="text-xs text-[#98A89F] max-w-md mx-auto">
+            <p className="text-xs text-[#A4B3AB] max-w-md mx-auto">
               Os perfis são criados automaticamente conforme os militares forem inseridos nas escalas, missões ou importados na Área Administrativa.
             </p>
           )}
@@ -726,44 +726,44 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-display text-sm font-bold text-[#F4E6C4] truncate">
+                      <div className="font-display text-sm font-bold text-[#F1F5F3] truncate">
                         {formatPersonnelDisplay(row.person)}
                       </div>
                       {row.person.company && (
-                        <div className="text-[11px] text-[#98A89F] mt-0.5">
+                        <div className="text-[11px] text-[#A4B3AB] mt-0.5">
                           {row.person.company}
                         </div>
                       )}
                     </div>
-                    <span className="text-[11px] font-medium text-[#E5C17B] shrink-0">
+                    <span className="text-[11px] font-medium text-[#DFBE78] shrink-0">
                       Histórico
                     </span>
                   </div>
 
                   <div className="grid grid-cols-6 gap-1.5 text-center font-mono tabular-nums text-xs">
-                    <div className="rounded-lg bg-[#2D5A43]/22 border border-[#83B499]/25 py-1.5">
-                      <div className="text-[10px] text-[#83B499]">P</div>
-                      <div className="font-bold text-[#E4EAE6]">{row.summary.blackCount}</div>
+                    <div className="rounded-lg bg-[#13281E] border border-[#2D6248] py-1.5">
+                      <div className="text-[10px] text-[#8CC4A7]">P</div>
+                      <div className="font-bold text-[#F1F5F3]">{row.summary.blackCount}</div>
                     </div>
-                    <div className="rounded-lg bg-[#7F1D1D]/25 border border-[#F87171]/25 py-1.5">
+                    <div className="rounded-lg bg-[#241214] border border-[#5A262B] py-1.5">
                       <div className="text-[10px] text-[#FCA5A5]">V</div>
-                      <div className="font-bold text-[#E4EAE6]">{row.summary.redCount}</div>
+                      <div className="font-bold text-[#F1F5F3]">{row.summary.redCount}</div>
                     </div>
-                    <div className="rounded-lg bg-[#C8A461]/18 border border-[#E5C17B]/25 py-1.5">
-                      <div className="text-[10px] text-[#E5C17B]">M</div>
-                      <div className="font-bold text-[#E4EAE6]">{row.summary.missionDays}</div>
+                    <div className="rounded-lg bg-[#1C1810] border border-[#63512C] py-1.5">
+                      <div className="text-[10px] text-[#DFBE78]">M</div>
+                      <div className="font-bold text-[#F1F5F3]">{row.summary.missionDays}</div>
                     </div>
-                    <div className="rounded-lg bg-[#075985]/22 border border-[#38BDF8]/25 py-1.5">
+                    <div className="rounded-lg bg-[#102431] border border-[#275776] py-1.5">
                       <div className="text-[10px] text-[#7DD3FC]">Folga</div>
-                      <div className="font-bold text-[#E4EAE6]">{row.summary.restDays}</div>
+                      <div className="font-bold text-[#F1F5F3]">{row.summary.restDays}</div>
                     </div>
-                    <div className="rounded-lg bg-[#0C1310]/80 border border-[#EBE0C8]/12 py-1.5">
-                      <div className="text-[10px] text-[#98A89F]">Emp</div>
-                      <div className="font-bold text-[#F4E6C4]">{row.summary.engagedDays}</div>
+                    <div className="rounded-lg bg-[#161D1A] border border-[#28352F] py-1.5">
+                      <div className="text-[10px] text-[#A4B3AB]">Emp</div>
+                      <div className="font-bold text-[#F1F5F3]">{row.summary.engagedDays}</div>
                     </div>
-                    <div className="rounded-lg bg-[#0C1310]/80 border border-[#EBE0C8]/12 py-1.5">
-                      <div className="text-[10px] text-[#7D8F85]">S/R</div>
-                      <div className="font-bold text-[#98A89F]">
+                    <div className="rounded-lg bg-[#0D1210] border border-[#1F2924] py-1.5">
+                      <div className="text-[10px] text-[#6E7E76]">S/R</div>
+                      <div className="font-bold text-[#A4B3AB]">
                         {row.summary.unregisteredDays}
                       </div>
                     </div>
@@ -805,10 +805,10 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             <div className="overflow-x-auto schedule-scroll">
               <table className="w-full border-collapse text-left">
                 <thead>
-                  <tr className="bg-[#0B120E] text-[#F4E6C4] border-b border-[#C9A961]/28">
+                  <tr className="bg-[#161D1A] text-[#F1F5F3] border-b border-[#28352F]">
                     <th
                       scope="col"
-                      className="sticky left-0 z-20 bg-[#0B120E] px-3.5 py-3 text-xs font-semibold border-r border-[#EBE0C8]/16 whitespace-nowrap min-w-[185px] sm:min-w-[215px]"
+                      className="sticky left-0 z-20 bg-[#161D1A] px-3.5 py-3 text-xs font-semibold border-r border-[#28352F] whitespace-nowrap min-w-[185px] sm:min-w-[215px]"
                     >
                       Militar
                     </th>
@@ -843,11 +843,11 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                               ? `${formatFullDatePt(d.date)} · ${d.holidayLabel}${isAdmin ? ' (clique para editar)' : ''}`
                               : `${formatFullDatePt(d.date)} · ${d.isRedScale ? 'Escala Vermelha' : 'Escala Preta'}${isAdmin ? ' (clique para editar)' : ''}`
                           }
-                          className={`p-0 text-center border-r border-[#EBE0C8]/8 min-w-[68px] sm:min-w-[78px] ${
+                          className={`p-0 text-center border-r border-[#1F2924] min-w-[68px] sm:min-w-[78px] ${
                             isToday
-                              ? 'bg-[#12261C] text-[#A8D8BE]'
+                              ? 'bg-[#13281E] text-[#8CC4A7]'
                               : d.isRedScale
-                              ? 'bg-[#231012] text-[#FCA5A5]'
+                              ? 'bg-[#221214] text-[#FCA5A5]'
                               : ''
                           }`}
                         >
@@ -861,7 +861,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                   holidayLabel: d.holidayLabel,
                                 })
                               }
-                              className="group w-full h-full px-1.5 py-2.5 cursor-pointer hover:bg-[#E4EAE6]/[0.08] transition-colors flex flex-col items-center justify-center"
+                              className="group w-full h-full px-1.5 py-2.5 cursor-pointer hover:bg-[#1C2521] transition-colors flex flex-col items-center justify-center"
                             >
                               {headerContent}
                             </button>
@@ -878,58 +878,58 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                     <th
                       scope="col"
                       title="Serviços na Escala Preta"
-                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#A8D8BE] bg-[#0D1913] border-l border-[#C9A961]/25 min-w-[42px]"
+                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#8CC4A7] bg-[#13281E] border-l border-[#28352F] min-w-[42px]"
                     >
                       P
                     </th>
                     <th
                       scope="col"
                       title="Serviços na Escala Vermelha"
-                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#FCA5A5] bg-[#1C0F11] border-l border-[#EBE0C8]/10 min-w-[42px]"
+                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#FCA5A5] bg-[#221214] border-l border-[#1F2924] min-w-[42px]"
                     >
                       V
                     </th>
                     <th
                       scope="col"
                       title="Dias em Missão"
-                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#E5C17B] bg-[#1D180F] border-l border-[#EBE0C8]/10 min-w-[42px]"
+                      className="px-2.5 py-3 text-center text-xs font-mono font-bold text-[#DFBE78] bg-[#1C1810] border-l border-[#1F2924] min-w-[42px]"
                     >
                       M
                     </th>
                     <th
                       scope="col"
                       title="Dias de Folga Automática no Período"
-                      className="px-2.5 py-3 text-center text-[11px] font-mono font-bold text-[#7DD3FC] bg-[#0B1822] border-l border-[#EBE0C8]/10 whitespace-nowrap min-w-[52px]"
+                      className="px-2.5 py-3 text-center text-[11px] font-mono font-bold text-[#7DD3FC] bg-[#102431] border-l border-[#1F2924] whitespace-nowrap min-w-[52px]"
                     >
                       Folga
                     </th>
                     <th
                       scope="col"
                       title="Dias Empenhados (Serviços + Missões)"
-                      className="px-2.5 py-3 text-center text-[11px] font-mono font-semibold text-[#F4E6C4] bg-[#0B120E] border-l border-[#EBE0C8]/12 whitespace-nowrap min-w-[54px]"
+                      className="px-2.5 py-3 text-center text-[11px] font-mono font-semibold text-[#F1F5F3] bg-[#161D1A] border-l border-[#28352F] whitespace-nowrap min-w-[54px]"
                     >
                       Emp.
                     </th>
                     <th
                       scope="col"
                       title="Dias sem Serviço Anterior Registrado"
-                      className="px-2.5 py-3 text-center text-[11px] font-mono font-semibold text-[#98A89F] bg-[#0B120E] border-l border-[#EBE0C8]/10 whitespace-nowrap min-w-[58px]"
+                      className="px-2.5 py-3 text-center text-[11px] font-mono font-semibold text-[#A4B3AB] bg-[#161D1A] border-l border-[#1F2924] whitespace-nowrap min-w-[58px]"
                     >
                       S/ Reg.
                     </th>
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
+                <tbody className="divide-y divide-[#1C2521] text-sm">
                   {visibleMatrixRows.map((row) => (
                     <tr
                       key={row.person.id}
-                      className="hover:bg-[#E4EAE6]/[0.035] transition-colors"
+                      className="hover:bg-[#161D1A] transition-colors"
                     >
                       {/* Fixed Soldier Column */}
                       <th
                         scope="row"
-                        className="sticky left-0 z-10 bg-[#0C1310] px-3.5 py-2.5 border-r border-[#EBE0C8]/16 whitespace-nowrap text-left font-normal align-middle"
+                        className="sticky left-0 z-10 bg-[#111614] px-3.5 py-2.5 border-r border-[#28352F] whitespace-nowrap text-left font-normal align-middle"
                       >
                         <button
                           type="button"
@@ -937,13 +937,13 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                           className="w-full text-left group cursor-pointer"
                         >
                           <div className="flex items-center gap-1.5">
-                            <span className="text-xs sm:text-[13px] font-semibold text-[#E4EAE6] group-hover:text-[#E5C17B] transition-colors truncate max-w-[155px] sm:max-w-[180px]">
+                            <span className="text-xs sm:text-[13px] font-semibold text-[#F1F5F3] group-hover:text-[#DFBE78] transition-colors truncate max-w-[155px] sm:max-w-[180px]">
                               {formatPersonnelDisplay(row.person)}
                             </span>
                             {(() => {
                               const tag = getScaleModeShortTag(getEffectiveScaleMode(row.person));
                               return tag ? (
-                                <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-[#1A2420] text-[#C8A461] border border-[#C8A461]/30">
+                                <span className="text-[9px] font-mono font-semibold px-1 py-0.5 rounded bg-[#1C1810] text-[#DFBE78] border border-[#63512C]">
                                   {tag}
                                 </span>
                               ) : null;
@@ -955,7 +955,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                             )}
                           </div>
                           {row.person.company && (
-                            <div className="text-[10px] text-[#7D8F85] truncate">
+                            <div className="text-[10px] text-[#6E7E76] truncate">
                               {row.person.company}
                             </div>
                           )}
@@ -971,13 +971,13 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                         return (
                           <td
                             key={d.date}
-                            className={`p-1 text-center border-r border-[#EBE0C8]/8 align-middle ${
+                            className={`p-1 text-center border-r border-[#1C2521] align-middle ${
                               isBlocked
-                                ? 'bg-[#121917]/80'
+                                ? 'bg-[#0D1210]'
                                 : isToday
-                                ? 'bg-[#2D5A43]/16'
+                                ? 'bg-[#13281E]/55'
                                 : d.isRedScale
-                                ? 'bg-[#7F1D1D]/12'
+                                ? 'bg-[#221214]/55'
                                 : ''
                             }`}
                           >
@@ -1003,7 +1003,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                     focusDate: d.date,
                                   })
                                 }
-                                className="w-full inline-flex items-center justify-center cursor-pointer hover:scale-[1.03] transition-transform"
+                                className="w-full inline-flex items-center justify-center cursor-pointer hover:brightness-110 transition-all"
                               >
                                 {renderCellContent(cell)}
                               </button>
@@ -1015,22 +1015,22 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                       })}
 
                       {/* Individual Summary Cells */}
-                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#A8D8BE] bg-[#0D1913]/60 border-l border-[#C9A961]/22">
+                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#8CC4A7] bg-[#13281E]/50 border-l border-[#28352F]">
                         {row.summary.blackCount}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#FCA5A5] bg-[#1C0F11]/60 border-l border-[#EBE0C8]/10">
+                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#FCA5A5] bg-[#221214]/50 border-l border-[#1F2924]">
                         {row.summary.redCount}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#E5C17B] bg-[#1D180F]/60 border-l border-[#EBE0C8]/10">
+                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#DFBE78] bg-[#1C1810]/50 border-l border-[#1F2924]">
                         {row.summary.missionDays}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#7DD3FC] bg-[#0B1822]/60 border-l border-[#EBE0C8]/10">
+                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#7DD3FC] bg-[#102431]/50 border-l border-[#1F2924]">
                         {row.summary.restDays}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#F4E6C4] border-l border-[#EBE0C8]/12">
+                      <td className="px-2 py-2 text-center font-mono text-xs font-bold tabular-nums text-[#F1F5F3] border-l border-[#28352F]">
                         {row.summary.engagedDays}
                       </td>
-                      <td className="px-2 py-2 text-center font-mono text-xs tabular-nums text-[#98A89F] border-l border-[#EBE0C8]/10">
+                      <td className="px-2 py-2 text-center font-mono text-xs tabular-nums text-[#A4B3AB] border-l border-[#1F2924]">
                         {row.summary.unregisteredDays}
                       </td>
                     </tr>
@@ -1039,7 +1039,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
               </table>
             </div>
             {matrix.rows.length > visibleRows && (
-              <div className="px-4 py-3 bg-[#0B120E]/85 border-t border-[#EBE0C8]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+              <div className="px-4 py-3 bg-[#0D1210] border-t border-[#1F2924] flex flex-wrap items-center justify-between gap-2 text-xs text-[#A4B3AB]">
                 <span className="font-mono tabular-nums">
                   Exibindo {visibleMatrixRows.length} de {matrix.rows.length} militares
                 </span>
@@ -1073,25 +1073,25 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
             onClick={() => setInspectedPersonId(null)}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-lg btl-modal overflow-hidden max-h-[85vh] flex flex-col"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-start justify-between gap-4">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <h2 className="font-display text-base sm:text-lg font-bold text-[#F4E6C4] truncate">
+                  <h2 className="font-display text-base sm:text-lg font-bold text-[#F1F5F3] truncate">
                     {formatPersonnelDisplay(inspectedRow.row.person)}
                   </h2>
-                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-[#98A89F] mt-0.5">
+                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-[#A4B3AB] mt-0.5">
                     <span>{inspectedRow.row.person.fullName}</span>
                     {inspectedRow.row.person.company && (
                       <>
@@ -1100,7 +1100,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                       </>
                     )}
                     <span aria-hidden="true">·</span>
-                    <span className="text-[#E5C17B]">
+                    <span className="text-[#DFBE78]">
                       {SCALE_MODE_LABELS[getEffectiveScaleMode(inspectedRow.row.person)]}
                     </span>
                     {!inspectedRow.row.person.active && (
@@ -1114,7 +1114,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setInspectedPersonId(null)}
-                  className="p-1.5 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                   aria-label="Fechar histórico individual"
                 >
                   <X className="w-4 h-4" />
@@ -1123,7 +1123,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
 
               {/* Admin-only quick scale eligibility switcher */}
               {isAdmin && onSavePersonScaleMode && (
-                <div className="px-6 py-3 bg-[#0A110E] border-b border-[#EBE0C8]/10 space-y-2">
+                <div className="px-6 py-3 bg-[#0D1210] border-b border-[#1F2924] space-y-2">
                   <div className="text-[11px] font-semibold text-[#C8D4CD]">
                     Concorrência de Escala
                   </div>
@@ -1138,8 +1138,8 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                           onClick={() => void handleChangeScaleMode(inspectedRow.row.person, mode)}
                           className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors cursor-pointer ${
                             active
-                              ? 'bg-[#C8A461]/24 text-[#F4E6C4] border-[#C8A461]/60'
-                              : 'bg-[#0E1713] text-[#98A89F] border-[#EBE0C8]/12 hover:text-[#E4EAE6]'
+                              ? 'bg-[#1C1810] text-[#DFBE78] border-[#63512C]'
+                              : 'bg-[#111614] text-[#A4B3AB] border-[#1F2924] hover:text-[#F1F5F3]'
                           }`}
                         >
                           {SCALE_MODE_LABELS[mode]}
@@ -1151,40 +1151,40 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
               )}
 
               {/* Individual Period Counters */}
-              <div className="px-6 py-4 bg-[#090F0C]/75 border-b border-[#EBE0C8]/10 grid grid-cols-3 sm:grid-cols-6 gap-2 text-center font-mono tabular-nums">
-                <div className="rounded-lg bg-[#2D5A43]/22 border border-[#83B499]/30 py-2">
-                  <div className="text-[10px] text-[#83B499]">Preta</div>
-                  <div className="text-sm font-bold text-[#E4EAE6]">
+              <div className="px-6 py-4 bg-[#0D1210] border-b border-[#1F2924] grid grid-cols-3 sm:grid-cols-6 gap-2 text-center font-mono tabular-nums">
+                <div className="rounded-lg bg-[#13281E] border border-[#2D6248] py-2">
+                  <div className="text-[10px] text-[#8CC4A7]">Preta</div>
+                  <div className="text-sm font-bold text-[#F1F5F3]">
                     {inspectedRow.row.summary.blackCount}
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#7F1D1D]/25 border border-[#F87171]/30 py-2">
+                <div className="rounded-lg bg-[#241214] border border-[#5A262B] py-2">
                   <div className="text-[10px] text-[#FCA5A5]">Vermelha</div>
-                  <div className="text-sm font-bold text-[#E4EAE6]">
+                  <div className="text-sm font-bold text-[#F1F5F3]">
                     {inspectedRow.row.summary.redCount}
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#C8A461]/20 border border-[#E5C17B]/30 py-2">
-                  <div className="text-[10px] text-[#E5C17B]">Missões</div>
-                  <div className="text-sm font-bold text-[#E4EAE6]">
+                <div className="rounded-lg bg-[#1C1810] border border-[#63512C] py-2">
+                  <div className="text-[10px] text-[#DFBE78]">Missões</div>
+                  <div className="text-sm font-bold text-[#F1F5F3]">
                     {inspectedRow.row.summary.missionCount}
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#075985]/22 border border-[#38BDF8]/30 py-2">
+                <div className="rounded-lg bg-[#102431] border border-[#275776] py-2">
                   <div className="text-[10px] text-[#7DD3FC]">Folgas</div>
-                  <div className="text-sm font-bold text-[#E4EAE6]">
+                  <div className="text-sm font-bold text-[#F1F5F3]">
                     {inspectedRow.row.summary.restDays}
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#0C1310] border border-[#EBE0C8]/15 py-2">
+                <div className="rounded-lg bg-[#161D1A] border border-[#28352F] py-2">
                   <div className="text-[10px] text-[#C8D4CD]">Empenh.</div>
-                  <div className="text-sm font-bold text-[#F4E6C4]">
+                  <div className="text-sm font-bold text-[#F1F5F3]">
                     {inspectedRow.row.summary.engagedDays}
                   </div>
                 </div>
-                <div className="rounded-lg bg-[#0C1310] border border-[#EBE0C8]/12 py-2">
-                  <div className="text-[10px] text-[#7D8F85]">S/ Reg.</div>
-                  <div className="text-sm font-bold text-[#98A89F]">
+                <div className="rounded-lg bg-[#111614] border border-[#1F2924] py-2">
+                  <div className="text-[10px] text-[#6E7E76]">S/ Reg.</div>
+                  <div className="text-sm font-bold text-[#A4B3AB]">
                     {inspectedRow.row.summary.unregisteredDays}
                   </div>
                 </div>
@@ -1193,21 +1193,21 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
               {/* Chronological Activities in Selected Period */}
               <div className="p-6 overflow-y-auto flex-1 space-y-3">
                 {inspectedRow.row.historyInPeriod.length === 0 ? (
-                  <p className="text-sm text-[#98A89F] text-center py-6">
+                  <p className="text-sm text-[#A4B3AB] text-center py-6">
                     Nenhuma atividade registrada neste período.
                   </p>
                 ) : (
-                  <div className="divide-y divide-[#EBE0C8]/10">
+                  <div className="divide-y divide-[#1C2521]">
                     {inspectedRow.row.historyInPeriod.map((item) => {
                       const isFocused = inspectedRow.focusDate === item.date;
                       return (
                         <div
                           key={item.date}
                           className={`py-3 first:pt-0 last:pb-0 space-y-2 ${
-                            isFocused ? 'bg-[#C8A461]/10 -mx-3 px-3 rounded-lg' : ''
+                            isFocused ? 'bg-[#1C1810] -mx-3 px-3 rounded-lg border border-[#63512C]' : ''
                           }`}
                         >
-                          <div className="font-mono text-xs font-semibold text-[#F4E6C4] tabular-nums">
+                          <div className="font-mono text-xs font-semibold text-[#DFBE78] tabular-nums">
                             {formatFullDatePt(item.date)}
                           </div>
                           <div className="space-y-1.5">
@@ -1224,20 +1224,20 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                                   {ev.shortLabel}
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <span className="font-semibold text-[#E4EAE6]">
+                                  <span className="font-semibold text-[#F1F5F3]">
                                     {ev.detail}
                                   </span>
-                                  <span className="text-[#697870] mx-1.5">·</span>
-                                  <span className="text-[#98A89F]">
+                                  <span className="text-[#4B5A53] mx-1.5">·</span>
+                                  <span className="text-[#A4B3AB]">
                                     {ev.label} ({getEventDotLabel(ev.code)})
                                   </span>
                                   {ev.restBeforeDuty !== null && ev.restBeforeDuty !== undefined && (
-                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-[#075985]/28 border border-[#38BDF8]/30 font-mono text-[10px] font-semibold text-[#7DD3FC]">
+                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded bg-[#102431] border border-[#275776] font-mono text-[10px] font-semibold text-[#7DD3FC]">
                                       Folga {ev.restBeforeDuty}×1
                                     </span>
                                   )}
                                   {ev.isSwap && ev.substituteLabel && (
-                                    <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#075985]/28 border border-[#38BDF8]/40 text-[11px] text-[#7DD3FC]">
+                                    <div className="mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#102431] border border-[#275776] text-[11px] text-[#7DD3FC]">
                                       <ArrowLeftRight className="w-3 h-3 shrink-0" />
                                       <span>
                                         Troca: ficou <strong>{ev.substituteLabel}</strong> no lugar
@@ -1270,39 +1270,39 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
             onClick={() => setEditingDay(null)}
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onClick={(e) => e.stopPropagation()}
               onSubmit={handleConfirmDayEdit}
               className="w-full max-w-sm btl-modal overflow-hidden"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   Configurar Dia
                 </h3>
                 <button
                   type="button"
                   onClick={() => setEditingDay(null)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="p-6 space-y-4">
-                <div className="font-mono text-sm font-semibold text-[#E5C17B]">
+                <div className="font-mono text-sm font-semibold text-[#DFBE78]">
                   {formatFullDatePt(editingDay.date)}
                 </div>
 
-                <label className="flex items-center gap-3 p-3 rounded-xl bg-[#090F0C]/80 border border-[#EBE0C8]/14 cursor-pointer">
+                <label className="flex items-center gap-3 p-3 rounded-lg bg-[#0D1210] border border-[#28352F] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={editingDay.isRedScale}
@@ -1311,7 +1311,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                     }
                     className="w-4 h-4 accent-[#F87171]"
                   />
-                  <span className="text-sm font-medium text-[#E4EAE6]">
+                  <span className="text-sm font-medium text-[#F1F5F3]">
                     Dia de Escala Vermelha (V)
                   </span>
                 </label>
@@ -1331,7 +1331,7 @@ export const DynamicMatrixView: React.FC<DynamicMatrixViewProps> = ({
                 </label>
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditingDay(null)}

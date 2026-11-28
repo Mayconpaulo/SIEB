@@ -46,17 +46,17 @@ function formatDateTimePt(iso: string): string {
 export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({ logs }) => {
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
+      <h1 className="font-display text-2xl font-bold text-[#F1F5F3]">
         Histórico de Alterações
       </h1>
 
       {logs.length === 0 ? (
         <div className="btl-card p-10 text-center space-y-2.5">
-          <Clock className="w-6 h-6 text-[#C8A461] mx-auto" />
-          <p className="text-sm font-semibold text-[#F4E6C4]">
+          <Clock className="w-6 h-6 text-[#C8A45D] mx-auto" />
+          <p className="text-sm font-semibold text-[#F1F5F3]">
             Nenhuma alteração registrada ainda
           </p>
-          <p className="text-xs text-[#98A89F] max-w-md mx-auto leading-relaxed">
+          <p className="text-xs text-[#A4B3AB] max-w-md mx-auto leading-relaxed">
             Assim que o administrador publicar ou editar escalas na Área Administrativa, cada modificação ficará registrada aqui automaticamente.
           </p>
         </div>
@@ -65,34 +65,34 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({ logs }) => {
           variants={STAGGER_CONTAINER}
           initial="hidden"
           animate="show"
-          className="btl-card divide-y divide-[#EBE0C8]/10 overflow-hidden"
+          className="btl-card divide-y divide-[#1C2521] overflow-hidden"
         >
           {logs.map((log) => (
             <motion.div
               key={log.id}
               variants={STAGGER_ITEM}
-              className="px-5 py-4 space-y-1.5 hover:bg-[#E4EAE6]/[0.025] transition-colors"
+              className="px-5 py-4 space-y-1.5 hover:bg-[#161D1A] transition-colors"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#A4B3AB]">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  <span className="font-semibold text-[#E5C17B]">
+                  <span className="font-semibold text-[#DFBE78]">
                     {ACTION_LABELS[log.action] ?? log.action}
                   </span>
-                  <span aria-hidden="true" className="text-[#697870]">·</span>
-                  <span className="font-medium text-[#E4EAE6]">{log.scheduleName}</span>
-                  <span aria-hidden="true" className="text-[#697870]">·</span>
+                  <span aria-hidden="true" className="text-[#4B5A53]">·</span>
+                  <span className="font-medium text-[#F1F5F3]">{log.scheduleName}</span>
+                  <span aria-hidden="true" className="text-[#4B5A53]">·</span>
                   <span>{log.actorLabel}</span>
                 </div>
                 <time
                   dateTime={log.createdAt}
-                  className="font-mono tabular-nums text-[#7D8F85]"
+                  className="font-mono tabular-nums text-[#6E7E76]"
                 >
                   {formatDateTimePt(log.createdAt)}
                 </time>
               </div>
-              <p className="text-sm font-medium text-[#F4E6C4]">{log.summary}</p>
+              <p className="text-sm font-medium text-[#F1F5F3]">{log.summary}</p>
               {log.details && (
-                <p className="text-xs text-[#98A89F] leading-relaxed">{log.details}</p>
+                <p className="text-xs text-[#A4B3AB] leading-relaxed">{log.details}</p>
               )}
             </motion.div>
           ))}

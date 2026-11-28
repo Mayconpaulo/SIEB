@@ -156,28 +156,28 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={TRANSITION_MICRO}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="admin-auth-title"
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            initial={{ opacity: 0, scale: 0.98, y: 6 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            exit={{ opacity: 0, scale: 0.98, y: 4 }}
             transition={SPRING_MODAL}
             className="w-full max-w-md btl-modal overflow-hidden"
           >
-            <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between gap-4">
+            <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
                 {needsSetup ? (
-                  <UserPlus className="w-4 h-4 text-[#E5C17B]" />
+                  <UserPlus className="w-4 h-4 text-[#DFBE78]" />
                 ) : (
-                  <Lock className="w-4 h-4 text-[#E5C17B]" />
+                  <Lock className="w-4 h-4 text-[#DFBE78]" />
                 )}
                 <h2
                   id="admin-auth-title"
-                  className="font-display text-base font-semibold text-[#F4E6C4]"
+                  className="font-display text-base font-semibold text-[#F1F5F3]"
                 >
                   {modalTitle}
                 </h2>
@@ -185,7 +185,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[#98A89F] hover:text-[#F4E6C4] rounded-lg transition-colors cursor-pointer"
+                className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 aria-label="Fechar janela de autenticação"
               >
                 <X className="w-4 h-4" />
@@ -194,14 +194,14 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 
             <div className="p-6 space-y-5">
               {loadingStatus ? (
-                <div className="py-6 text-center text-sm text-[#98A89F]">
+                <div className="py-6 text-center text-sm text-[#A4B3AB]">
                   Verificando acesso administrativo...
                 </div>
               ) : statusError ? (
                 <div className="space-y-4">
                   <div
                     role="alert"
-                    className="flex items-start gap-2.5 p-3.5 rounded-xl bg-[#7F1D1D]/24 border border-[#F87171]/35 text-xs text-[#FECACA]"
+                    className="flex items-start gap-2.5 p-3.5 rounded-lg bg-[#241214] border border-[#5A262B] text-xs text-[#FECACA]"
                   >
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FCA5A5]" />
                     <span>{statusError}</span>
@@ -226,7 +226,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  <p className="text-sm text-[#98A89F] leading-relaxed">
+                  <p className="text-sm text-[#A4B3AB] leading-relaxed">
                     {needsSetup
                       ? 'Defina o primeiro nome de usuário e senha de administrador. Depois de entrar, você poderá criar outros logins e senhas na aba Acessos.'
                       : 'Informe seu nome de usuário e senha para entrar na área administrativa.'}
@@ -235,7 +235,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   {errorMsg && (
                     <div
                       role="alert"
-                      className="space-y-2.5 p-3.5 rounded-xl bg-[#7F1D1D]/24 border border-[#F87171]/35 text-xs text-[#FECACA]"
+                      className="space-y-2.5 p-3.5 rounded-lg bg-[#241214] border border-[#5A262B] text-xs text-[#FECACA]"
                     >
                       <div className="flex items-start gap-2.5">
                         <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FCA5A5]" />
@@ -243,18 +243,18 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       </div>
 
                       {providerNotEnabled && (
-                        <div className="pt-2.5 border-t border-[#F87171]/25 space-y-2 text-[#FECACA]/90">
+                        <div className="pt-2.5 border-t border-[#5A262B] space-y-2 text-[#FECACA]">
                           <p>
                             Para habilitar login por usuário e senha, ative uma única vez no Firebase
                             Console:
                           </p>
                           <ol className="list-decimal list-inside space-y-1 text-[11px]">
                             <li>
-                              Abra <strong className="text-[#F4E6C4]">Authentication → Sign-in method</strong>
+                              Abra <strong className="text-[#F1F5F3]">Authentication → Sign-in method</strong>
                             </li>
                             <li>
-                              Clique em <strong className="text-[#F4E6C4]">E-mail/senha</strong>, ative a
-                              primeira chave e clique em <strong className="text-[#F4E6C4]">Salvar</strong>
+                              Clique em <strong className="text-[#F1F5F3]">E-mail/senha</strong>, ative a
+                              primeira chave e clique em <strong className="text-[#F1F5F3]">Salvar</strong>
                             </li>
                             <li>Volte aqui e tente entrar novamente</li>
                           </ol>
@@ -262,7 +262,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                             href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/providers`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 font-semibold text-[#E5C17B] hover:text-[#F4E6C4] hover:underline pt-0.5"
+                            className="inline-flex items-center gap-1.5 font-semibold text-[#DFBE78] hover:text-[#F1F5F3] hover:underline pt-0.5"
                           >
                             <span>Abrir Firebase Authentication</span>
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -280,7 +280,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       Nome de usuário
                     </label>
                     <div className="relative">
-                      <User className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <User className="w-4 h-4 text-[#C8A45D] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         id="admin-username-input"
                         type="text"
@@ -299,9 +299,9 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       />
                     </div>
                     {showNormalizedHint && (
-                      <p className="text-[11px] text-[#98A89F]">
+                      <p className="text-[11px] text-[#A4B3AB]">
                         Login salvo como:{' '}
-                        <span className="font-mono text-[#E5C17B]">{normalizedPreview}</span>
+                        <span className="font-mono text-[#DFBE78]">{normalizedPreview}</span>
                       </p>
                     )}
                   </div>
@@ -313,7 +313,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                         className="block text-xs font-semibold text-[#C8D4CD]"
                       >
                         Nome de exibição{' '}
-                        <span className="font-normal text-[#7D8F85]">(opcional)</span>
+                        <span className="font-normal text-[#6E7E76]">(opcional)</span>
                       </label>
                       <input
                         id="admin-displayname-input"
@@ -336,7 +336,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       {needsSetup ? 'Senha (mín. 6 caracteres)' : 'Senha'}
                     </label>
                     <div className="relative">
-                      <KeyRound className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <KeyRound className="w-4 h-4 text-[#C8A45D] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         id="admin-password-input"
                         type={showPassword ? 'text' : 'password'}
@@ -352,7 +352,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] cursor-pointer"
                         aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         {showPassword ? (

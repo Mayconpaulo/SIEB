@@ -156,8 +156,8 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="inline-flex items-center gap-2 text-[#F4E6C4]">
-          <Briefcase className="w-5 h-5 text-[#C8A461]" />
+        <div className="inline-flex items-center gap-2 text-[#F1F5F3]">
+          <Briefcase className="w-5 h-5 text-[#C8A45D]" />
           <h2 className="font-display text-lg font-semibold">
             Missões ({missions.length})
           </h2>
@@ -186,7 +186,7 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
 
       {/* MISSIONS LIST */}
       {missions.length === 0 ? (
-        <div className="btl-card p-10 text-center text-sm text-[#98A89F]">
+        <div className="btl-card p-10 text-center text-sm text-[#A4B3AB]">
           Nenhuma missão cadastrada.
         </div>
       ) : (
@@ -198,36 +198,36 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
             >
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between gap-2 text-xs font-mono tabular-nums">
-                  <span className="text-[#E5C17B] font-semibold">
+                  <span className="text-[#DFBE78] font-semibold">
                     {formatShortDatePt(mission.startDate)} – {formatShortDatePt(mission.endDate)}
                   </span>
-                  <span className="text-[#98A89F] inline-flex items-center gap-1">
+                  <span className="text-[#A4B3AB] inline-flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
                     {mission.personnelIds.length}
                   </span>
                 </div>
 
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   {mission.title}
                 </h3>
 
                 {mission.location && (
-                  <div className="inline-flex items-center gap-1.5 text-xs text-[#98A89F]">
-                    <MapPin className="w-3.5 h-3.5 text-[#C8A461]" />
+                  <div className="inline-flex items-center gap-1.5 text-xs text-[#A4B3AB]">
+                    <MapPin className="w-3.5 h-3.5 text-[#C8A45D]" />
                     <span>{mission.location}</span>
                   </div>
                 )}
 
-                <div className="pt-2.5 border-t border-[#EBE0C8]/10 flex flex-wrap gap-1.5">
+                <div className="pt-2.5 border-t border-[#1F2924] flex flex-wrap gap-1.5">
                   {mission.personnelIds.length === 0 ? (
-                    <span className="text-xs text-[#697870]">Sem militares designados</span>
+                    <span className="text-xs text-[#6E7E76]">Sem militares designados</span>
                   ) : (
                     mission.personnelIds.map((pid) => {
                       const p = personById.get(pid);
                       return (
                         <span
                           key={pid}
-                          className="px-2 py-0.5 rounded-md bg-[#C8A461]/15 border border-[#C8A461]/30 text-[11px] font-medium text-[#F4E6C4]"
+                          className="px-2 py-0.5 rounded-md bg-[#1C1810] border border-[#63512C] text-[11px] font-medium text-[#DFBE78]"
                         >
                           {p ? formatPersonnelDisplay(p) : pid}
                         </span>
@@ -237,7 +237,7 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#EBE0C8]/10">
+              <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#1F2924]">
                 <button
                   type="button"
                   onClick={() => {
@@ -255,7 +255,7 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
                   }}
                   className="btl-btn btl-btn-secondary min-h-[36px] px-3 py-1 text-xs"
                 >
-                  <Pencil className="w-3.5 h-3.5 text-[#E5C17B]" />
+                  <Pencil className="w-3.5 h-3.5 text-[#DFBE78]" />
                   <span>Editar missão</span>
                 </button>
 
@@ -293,26 +293,26 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onSubmit={handleSaveMission}
               className="w-full max-w-xl btl-modal overflow-hidden max-h-[90vh] flex flex-col"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   {editingMission.mode === 'create' ? 'Cadastrar Missão' : 'Editar Missão'}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setEditingMission(null)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -418,7 +418,7 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
                         return (
                           <span
                             key={pid}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#C8A461]/18 border border-[#C8A461]/40 text-xs font-medium text-[#F4E6C4]"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1C1810] border border-[#63512C] text-xs font-medium text-[#DFBE78]"
                           >
                             <span>{p ? formatPersonnelDisplay(p) : pid}</span>
                             <button
@@ -431,7 +431,7 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
                                   ),
                                 })
                               }
-                              className="text-[#E5C17B] hover:text-[#FCA5A5] cursor-pointer"
+                              className="text-[#DFBE78] hover:text-[#FCA5A5] cursor-pointer"
                               aria-label="Remover militar da missão"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -457,7 +457,7 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
                 </label>
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditingMission(null)}
@@ -486,21 +486,21 @@ export const AdminMissionsLeavesTab: React.FC<AdminMissionsLeavesTabProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               className="w-full max-w-md btl-modal p-6 space-y-4"
             >
-              <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                 {confirmDelete.title}
               </h3>
-              <p className="text-sm text-[#98A89F] leading-relaxed">
+              <p className="text-sm text-[#A4B3AB] leading-relaxed">
                 {confirmDelete.description}
               </p>
               <div className="flex items-center justify-end gap-2.5 pt-2">

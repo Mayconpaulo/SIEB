@@ -463,7 +463,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="font-display text-lg font-semibold text-[#F4E6C4]">
+          <h2 className="font-display text-lg font-semibold text-[#F1F5F3]">
             Efetivo Cadastrado ({personnel.filter((p) => p.active).length} ativos)
           </h2>
         </div>
@@ -475,7 +475,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
               onClick={() => void handleManualSyncBattalion()}
               className="btl-btn btl-btn-secondary text-xs sm:text-sm"
             >
-              <CloudUpload className="w-4 h-4 text-[#A8D8BE]" />
+              <CloudUpload className="w-4 h-4 text-[#8CC4A7]" />
               <span>Sincronizar efetivo ({pendingSyncCount})</span>
             </button>
           )}
@@ -485,7 +485,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
             onClick={() => void handleLoadFromGoogleSheetsRoster()}
             className="btl-btn btl-btn-secondary text-xs sm:text-sm"
           >
-            <FileSpreadsheet className="w-4 h-4 text-[#A8D8BE]" />
+            <FileSpreadsheet className="w-4 h-4 text-[#8CC4A7]" />
             <span>Planilha Google</span>
           </button>
           <button
@@ -524,7 +524,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
       {/* Filters */}
       <div className="btl-panel p-4 flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Search className="w-4 h-4 text-[#C8A45D] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="search"
             value={search}
@@ -558,7 +558,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
 
       {/* Personnel Table */}
       {filtered.length === 0 ? (
-        <div className="btl-card p-10 text-center text-sm text-[#98A89F]">
+        <div className="btl-card p-10 text-center text-sm text-[#A4B3AB]">
           Nenhum militar encontrado com os filtros atuais.
         </div>
       ) : (
@@ -566,7 +566,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
           <div className="overflow-x-auto schedule-scroll">
             <table className="w-full border-collapse text-left">
               <thead>
-                <tr className="bg-[#0B120E] text-[#F4E6C4] border-b border-[#C9A961]/25 text-xs">
+                <tr className="bg-[#161D1A] text-[#F1F5F3] border-b border-[#28352F] text-xs">
                   <th className="px-4 py-3 font-semibold">Graduação</th>
                   <th className="px-4 py-3 font-semibold">Nome de Guerra</th>
                   <th className="px-4 py-3 font-semibold">Nome Completo</th>
@@ -576,19 +576,19 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                   <th className="px-4 py-3 font-semibold text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#EBE0C8]/10 text-sm">
+              <tbody className="divide-y divide-[#1C2521] text-sm">
                 {visiblePersonnel.map((p) => {
                   const mode = p.scaleMode ?? 'both';
                   return (
-                    <tr key={p.id} className="hover:bg-[#E4EAE6]/[0.03] transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs text-[#E5C17B] whitespace-nowrap">
+                    <tr key={p.id} className="hover:bg-[#161D1A] transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-[#DFBE78] whitespace-nowrap">
                         {p.rank || '—'}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-[#F4E6C4] whitespace-nowrap">
+                      <td className="px-4 py-3 font-semibold text-[#F1F5F3] whitespace-nowrap">
                         {p.warName}
                       </td>
                       <td className="px-4 py-3 text-[#C8D4CD]">{p.fullName}</td>
-                      <td className="px-4 py-3 text-xs text-[#98A89F] whitespace-nowrap">
+                      <td className="px-4 py-3 text-xs text-[#A4B3AB] whitespace-nowrap">
                         {p.company || '—'}
                       </td>
                       <td className="px-4 py-3 text-xs whitespace-nowrap">
@@ -597,8 +597,8 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                             mode === 'none'
                               ? 'text-[#FCA5A5] font-medium'
                               : mode === 'both'
-                              ? 'text-[#98A89F]'
-                              : 'text-[#E5C17B] font-medium'
+                              ? 'text-[#A4B3AB]'
+                              : 'text-[#DFBE78] font-medium'
                           }
                         >
                           {SCALE_MODE_LABELS[mode]}
@@ -607,7 +607,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                       <td className="px-4 py-3 text-xs whitespace-nowrap">
                         <span
                           className={
-                            p.active ? 'text-[#A8D8BE] font-medium' : 'text-[#FCA5A5] font-medium'
+                            p.active ? 'text-[#8CC4A7] font-medium' : 'text-[#FCA5A5] font-medium'
                           }
                         >
                           {p.active ? 'Ativo' : 'Inativo'}
@@ -630,7 +630,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                             }
                             className="btl-btn btl-btn-secondary min-h-[34px] px-2.5 py-1 text-xs"
                           >
-                            <Pencil className="w-3.5 h-3.5 text-[#E5C17B]" />
+                            <Pencil className="w-3.5 h-3.5 text-[#DFBE78]" />
                             <span>Editar</span>
                           </button>
                         <button
@@ -662,7 +662,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
             </table>
           </div>
           {filtered.length > visibleCount && (
-            <div className="px-4 py-3 bg-[#0B120E]/85 border-t border-[#EBE0C8]/10 flex flex-wrap items-center justify-between gap-2 text-xs text-[#98A89F]">
+            <div className="px-4 py-3 bg-[#0D1210] border-t border-[#1F2924] flex flex-wrap items-center justify-between gap-2 text-xs text-[#A4B3AB]">
               <span className="font-mono tabular-nums">
                 Exibindo {visiblePersonnel.length} de {filtered.length} militares
               </span>
@@ -695,26 +695,26 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.form
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               onSubmit={handleSavePerson}
               className="w-full max-w-md btl-modal overflow-hidden"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
-                <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
+                <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                   {editingPerson.mode === 'create' ? 'Cadastrar Militar' : 'Editar Militar'}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setEditingPerson(null)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -809,7 +809,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                 </label>
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex justify-end gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setEditingPerson(null)}
@@ -838,28 +838,28 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={TRANSITION_MICRO}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/72 backdrop-blur-sm p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#050706]/80 p-4"
             role="dialog"
             aria-modal="true"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              initial={{ opacity: 0, scale: 0.98, y: 6 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              exit={{ opacity: 0, scale: 0.98, y: 4 }}
               transition={SPRING_MODAL}
               className="w-full max-w-2xl btl-modal overflow-hidden max-h-[88vh] flex flex-col"
             >
-              <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between">
+              <div className="px-6 py-4 bg-[#161D1A] border-b border-[#1F2924] flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <FileSpreadsheet className="w-4 h-4 text-[#E5C17B]" />
-                  <h3 className="font-display text-base font-semibold text-[#F4E6C4]">
+                  <FileSpreadsheet className="w-4 h-4 text-[#DFBE78]" />
+                  <h3 className="font-display text-base font-semibold text-[#F1F5F3]">
                     Importar Relação do Efetivo
                   </h3>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowImportModal(false)}
-                  className="p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                  className="p-1.5 text-[#A4B3AB] hover:text-[#F1F5F3] hover:bg-[#1C2521] rounded-lg transition-colors cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -879,13 +879,13 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="w-full border border-dashed border-[#C9A961]/45 hover:border-[#E5C17B] bg-[#0B120E]/70 rounded-xl p-6 flex flex-col items-center justify-center gap-2 text-center transition-colors cursor-pointer"
+                        className="w-full border border-dashed border-[#63512C] hover:border-[#C8A45D] bg-[#0D1210] hover:bg-[#161D1A] rounded-xl p-6 flex flex-col items-center justify-center gap-2 text-center transition-colors cursor-pointer"
                       >
-                        <Upload className="w-6 h-6 text-[#E5C17B]" />
-                        <span className="text-sm font-semibold text-[#F4E6C4]">
+                        <Upload className="w-6 h-6 text-[#DFBE78]" />
+                        <span className="text-sm font-semibold text-[#F1F5F3]">
                           Selecionar arquivo Excel (.xlsx / .xls) ou CSV
                         </span>
-                        <span className="text-xs text-[#98A89F]">
+                        <span className="text-xs text-[#A4B3AB]">
                           Colunas reconhecidas: Graduação, Nome Completo, Nome de Guerra, Companhia
                         </span>
                       </button>
@@ -917,30 +917,30 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                 ) : (
                   <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold text-[#F4E6C4]">
+                      <span className="font-semibold text-[#F1F5F3]">
                         Origem: {importFileName}
                       </span>
                       <div className="flex items-center gap-3 font-mono tabular-nums">
-                        <span className="text-[#A8D8BE]">{importCounts.create} novos</span>
-                        <span className="text-[#E5C17B]">{importCounts.update} atualizações</span>
-                        <span className="text-[#98A89F]">{importCounts.unchanged} iguais</span>
+                        <span className="text-[#8CC4A7]">{importCounts.create} novos</span>
+                        <span className="text-[#DFBE78]">{importCounts.update} atualizações</span>
+                        <span className="text-[#A4B3AB]">{importCounts.unchanged} iguais</span>
                       </div>
                     </div>
 
-                    <div className="max-h-72 overflow-y-auto schedule-scroll rounded-xl border border-[#EBE0C8]/12 divide-y divide-[#EBE0C8]/10 bg-[#090F0C]/60">
+                    <div className="max-h-72 overflow-y-auto schedule-scroll rounded-xl border border-[#1F2924] divide-y divide-[#1C2521] bg-[#0D1210]">
                       {importPlan.map((item, idx) => (
                         <div
                           key={`${item.candidate.warName}-${idx}`}
                           className="px-4 py-2.5 flex items-center justify-between gap-3 text-xs"
                         >
                           <div className="min-w-0">
-                            <div className="font-semibold text-[#E4EAE6] truncate">
+                            <div className="font-semibold text-[#F1F5F3] truncate">
                               {item.candidate.rank ? `${item.candidate.rank} ` : ''}
                               {item.candidate.warName}
                               {item.candidate.company ? ` · ${item.candidate.company}` : ''}
                             </div>
                             {item.changesSummary && (
-                              <div className="text-[11px] text-[#E5C17B] truncate">
+                              <div className="text-[11px] text-[#DFBE78] truncate">
                                 {item.changesSummary}
                               </div>
                             )}
@@ -948,10 +948,10 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                           <span
                             className={`font-mono text-[11px] font-semibold shrink-0 ${
                               item.action === 'create'
-                                ? 'text-[#A8D8BE]'
+                                ? 'text-[#8CC4A7]'
                                 : item.action === 'update'
-                                ? 'text-[#E5C17B]'
-                                : 'text-[#697870]'
+                                ? 'text-[#DFBE78]'
+                                : 'text-[#6E7E76]'
                             }`}
                           >
                             {item.action === 'create'
@@ -967,7 +967,7 @@ export const AdminPersonnelTab: React.FC<AdminPersonnelTabProps> = ({
                 )}
               </div>
 
-              <div className="px-6 py-4 bg-[#090F0C]/85 border-t border-[#EBE0C8]/10 flex items-center justify-between gap-2.5">
+              <div className="px-6 py-4 bg-[#0D1210] border-t border-[#1F2924] flex items-center justify-between gap-2.5">
                 {importPlan ? (
                   <button
                     type="button"

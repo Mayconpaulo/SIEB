@@ -105,14 +105,19 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <h1 className="font-display text-2xl font-bold text-[#F4E6C4]">
-        Pesquisa por Militar
-      </h1>
+      <div>
+        <h1 className="font-display text-2xl sm:text-[26px] font-bold tracking-tight text-[#F1F5F3]">
+          Pesquisa por Militar
+        </h1>
+        <p className="text-xs text-[#A4B3AB] mt-1">
+          Localize todos os serviços e trocas de um militar em todas as escalas cadastradas.
+        </p>
+      </div>
 
       <div className="btl-panel p-5 space-y-4">
         <div className="flex flex-col md:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-[#C8A45D] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
               value={queryText}
@@ -120,13 +125,13 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
               placeholder="Digite o nome de guerra do militar..."
               aria-label="Nome de guerra do militar"
               autoFocus
-              className="btl-input min-h-[44px] pl-10 pr-9 py-2"
+              className="btl-input min-h-[42px] pl-10 pr-9 py-2"
             />
             {queryText && (
               <button
                 type="button"
                 onClick={() => setQueryText('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#A4B3AB] hover:text-[#F1F5F3] cursor-pointer"
                 aria-label="Limpar pesquisa"
               >
                 <X className="w-4 h-4" />
@@ -138,7 +143,7 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
             value={scheduleFilter}
             onChange={(e) => setScheduleFilter(e.target.value)}
             aria-label="Filtrar por escala"
-            className="btl-select md:w-64 min-h-[44px] px-3.5 py-2"
+            className="btl-select md:w-64 min-h-[42px] px-3.5 py-2"
           >
             <option value="all">Todas as escalas</option>
             {schedules.map((s) => (
@@ -148,20 +153,20 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
             ))}
           </select>
 
-          <label className="inline-flex items-center gap-2 min-h-[44px] px-3 text-sm text-[#C8D4CD] cursor-pointer select-none whitespace-nowrap">
+          <label className="inline-flex items-center gap-2 min-h-[42px] px-3 text-sm text-[#C8D4CD] cursor-pointer select-none whitespace-nowrap">
             <input
               type="checkbox"
               checked={onlyUpcoming}
               onChange={(e) => setOnlyUpcoming(e.target.checked)}
-              className="accent-[#C8A461]"
+              className="accent-[#C8A45D]"
             />
             <span>A partir de hoje</span>
           </label>
         </div>
 
         {!normalized && suggestedNames.length > 0 && (
-          <div className="pt-3 border-t border-[#EBE0C8]/10 flex flex-wrap items-center gap-2">
-            <span className="text-xs text-[#98A89F] mr-1">Consulta rápida:</span>
+          <div className="pt-3.5 border-t border-[#1F2924] flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[#A4B3AB] mr-1">Consulta rápida:</span>
             {suggestedNames.map((name) => (
               <button
                 key={name}
@@ -178,9 +183,9 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
 
       {normalized && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between text-xs text-[#98A89F]">
+          <div className="flex items-center justify-between text-xs text-[#A4B3AB]">
             <span className="tabular-nums">
-              <strong className="text-[#E5C17B]">{matches.length}</strong>{' '}
+              <strong className="text-[#DFBE78]">{matches.length}</strong>{' '}
               {matches.length === 1 ? 'serviço encontrado' : 'serviços encontrados'} para “
               {queryText.trim()}”
             </span>
@@ -188,10 +193,10 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
 
           {matches.length === 0 ? (
             <div className="btl-card p-8 text-center">
-              <p className="text-sm font-medium text-[#F4E6C4]">
+              <p className="text-sm font-medium text-[#F1F5F3]">
                 Nenhum serviço localizado com este termo.
               </p>
-              <p className="text-xs text-[#98A89F] mt-1">
+              <p className="text-xs text-[#A4B3AB] mt-1">
                 Tente pesquisar apenas o sobrenome ou nome de guerra sem posto/graduação.
               </p>
             </div>
@@ -200,7 +205,7 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
               variants={STAGGER_CONTAINER}
               initial="hidden"
               animate="show"
-              className="btl-card divide-y divide-[#EBE0C8]/10 overflow-hidden"
+              className="btl-card divide-y divide-[#1C2521] overflow-hidden"
             >
               {matches.map((m, i) => {
                 const isToday = m.date === todayIso;
@@ -209,7 +214,7 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
                     key={`${m.scheduleId}-${m.date}-${m.columnLabel}-${i}`}
                     variants={STAGGER_ITEM}
                     className={`px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors ${
-                      isToday ? 'bg-[#2D5A43]/20' : 'hover:bg-[#E4EAE6]/[0.03]'
+                      isToday ? 'bg-[#13281E]' : 'hover:bg-[#161D1A]'
                     }`}
                   >
                     <div className="space-y-1">
@@ -219,35 +224,35 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
                             m.isRedScale
                               ? 'text-[#FCA5A5]'
                               : isToday
-                              ? 'text-[#A8D8BE]'
-                              : 'text-[#F4E6C4]'
+                              ? 'text-[#8CC4A7]'
+                              : 'text-[#F1F5F3]'
                           }`}
                         >
                           {formatFullDatePt(m.date)}
                         </span>
                         {isToday && (
                           <>
-                            <span aria-hidden="true" className="text-[#697870]">·</span>
-                            <span className="font-semibold text-[#A8D8BE]">Hoje</span>
+                            <span aria-hidden="true" className="text-[#374840]">·</span>
+                            <span className="font-semibold text-[#8CC4A7]">Hoje</span>
                           </>
                         )}
                         {m.isRedScale && (
                           <>
-                            <span aria-hidden="true" className="text-[#697870]">·</span>
+                            <span aria-hidden="true" className="text-[#374840]">·</span>
                             <span className="text-[#FCA5A5]">
                               {m.holidayLabel || 'Escala Vermelha'}
                             </span>
                           </>
                         )}
-                        <span aria-hidden="true" className="text-[#697870]">·</span>
-                        <span className="text-[#98A89F]">{m.scheduleName}</span>
+                        <span aria-hidden="true" className="text-[#374840]">·</span>
+                        <span className="text-[#A4B3AB]">{m.scheduleName}</span>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-xs font-medium text-[#98A89F]">
+                        <span className="text-xs font-medium text-[#A4B3AB]">
                           {m.columnLabel}:
                         </span>
-                        <span className="text-sm font-semibold text-[#E4EAE6]">
+                        <span className="text-sm font-semibold text-[#F1F5F3]">
                           <DutyAssignmentBadge
                             rawValue={m.rawValue}
                             highlightTerm={normalized}
@@ -268,7 +273,7 @@ export const SoldierSearchView: React.FC<SoldierSearchViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onJumpToDuty(m.scheduleId, m.date)}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-[#E5C17B] hover:text-[#F4E6C4] hover:underline underline-offset-4 whitespace-nowrap self-start sm:self-center transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[#DFBE78] hover:text-[#F1F5F3] hover:underline underline-offset-4 whitespace-nowrap self-start sm:self-center transition-colors cursor-pointer"
                     >
                       <span>Ver na escala</span>
                       <ArrowUpRight className="w-3.5 h-3.5" />
