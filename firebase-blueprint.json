@@ -322,7 +322,10 @@
             "delete_mission",
             "create_leave",
             "delete_leave",
-            "update_calendar_day"
+            "update_calendar_day",
+            "create_admin",
+            "update_admin",
+            "delete_admin"
           ]
         },
         "scheduleId": {
@@ -367,54 +370,77 @@
     },
     "AdminMember": {
       "title": "AdminMember",
-      "description": "Registro de administradores autorizados para escrita no banco.",
+      "description": "Conta administrativa autenticada por nome de usuário e senha, gerenciada no painel administrativo.",
       "type": "object",
       "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^[a-z0-9._\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
         "role": {
           "type": "string",
           "enum": ["admin"]
         },
+        "active": {
+          "type": "boolean"
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
-        }
-      },
-      "required": ["role", "createdAt"]
-    },
-    "AdminSecurityConfig": {
-      "title": "AdminSecurityConfig",
-      "description": "Hash criptográfico (PBKDF2-SHA256 com salt) da senha única administrativa, restrito exclusivamente a administradores verificados.",
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string",
-          "enum": ["passcode"]
-        },
-        "algorithm": {
-          "type": "string",
-          "enum": ["PBKDF2-SHA256"]
-        },
-        "iterations": {
-          "type": "number"
-        },
-        "salt": {
-          "type": "string",
-          "minLength": 32,
-          "maxLength": 64,
-          "pattern": "^[a-f0-9]+$"
-        },
-        "hash": {
-          "type": "string",
-          "minLength": 64,
-          "maxLength": 128,
-          "pattern": "^[a-f0-9]+$"
         },
         "updatedAt": {
           "type": "string",
           "format": "date-time"
         }
       },
-      "required": ["id", "algorithm", "iterations", "salt", "hash", "updatedAt"]
+      "required": [
+        "uid",
+        "username",
+        "displayName",
+        "role",
+        "active",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminSecurityConfig": {
+      "title": "AdminSecurityConfig",
+      "description": "Marcador imutável (sem PII) que indica se o primeiro administrador do sistema já foi cadastrado.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["bootstrap"]
+        },
+        "initialized": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "initialized", "createdAt"]
     },
     "CalendarDayOverride": {
       "title": "CalendarDayOverride",

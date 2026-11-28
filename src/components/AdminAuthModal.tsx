@@ -1,62 +1,32 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   AlertCircle,
-  Check,
-  CheckCircle2,
-  Copy,
   ExternalLink,
+  Eye,
+  EyeOff,
   KeyRound,
   Lock,
   RefreshCw,
+  User,
+  UserPlus,
   X,
 } from 'lucide-react';
 import {
   AdminApiError,
-  fetchFirebasePasscodeRecord,
-  getAdminStatus,
-  loginAdminPassword,
-  logoutAdminToken,
-  setupAdminPassword,
-  setupFirebaseAdminPasscode,
-  verifyFirebaseAdminPasscode,
-  type AdminAuthMode,
-  type FirebasePasscodeRecord,
+  checkAdminBootstrapStatus,
+  loginAdminWithCredentials,
+  normalizeAdminUsername,
+  registerFirstAdmin,
 } from '../lib/adminApi';
-import {
-  auth,
-  firebaseProjectId,
-  googleProvider,
-  setGoogleAccessToken,
-} from '../lib/firebase';
+import { firebaseProjectId } from '../lib/firebase';
 import { SPRING_MODAL, TRANSITION_MICRO } from '../lib/motion';
-
-const GoogleBrandIcon: React.FC<{ className?: string }> = ({ className = 'w-4 h-4 shrink-0' }) => (
-  <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
-    <path
-      fill="#EA4335"
-      d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-    />
-    <path
-      fill="#4285F4"
-      d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-    />
-    <path
-      fill="#FBBC05"
-      d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-    />
-    <path
-      fill="#34A853"
-      d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-    />
-  </svg>
-);
+import type { AdminAccount } from '../types/schedule';
 
 interface AdminAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAuthenticated: (serverToken: string) => void;
+  onAuthenticated: (token: string, admin: AdminAccount) => void;
 }
 
 export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
@@ -66,59 +36,30 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
 }) => {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [statusError, setStatusError] = useState('');
-  const [authMode, setAuthMode] = useState<AdminAuthMode>('express');
   const [needsSetup, setNeedsSetup] = useState(false);
 
+  const [username, setUsername] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [providerNotEnabled, setProviderNotEnabled] = useState(false);
 
-  // Express mode step 2 (after server password): link Google admin account for Firestore writes
-  const [verifiedServerToken, setVerifiedServerToken] = useState<string | null>(null);
-  const [linkingDb, setLinkingDb] = useState(false);
-
-  // Firebase mode state: step 1 Google admin verification -> step 2 passcode check/setup
-  const [firebaseAdminVerified, setFirebaseAdminVerified] = useState(false);
-  const [firebaseRecord, setFirebaseRecord] = useState<FirebasePasscodeRecord | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [cooldownUntil, setCooldownUntil] = useState(0);
-  const [unauthorizedHost, setUnauthorizedHost] = useState<string | null>(null);
-  const [copiedHost, setCopiedHost] = useState(false);
 
-  const loadFirebasePasscodeState = useCallback(async () => {
-    const record = await fetchFirebasePasscodeRecord();
-    setFirebaseRecord(record);
-    setNeedsSetup(record === null);
-    setFirebaseAdminVerified(true);
-  }, []);
-
-  const loadStatus = useCallback(async () => {
+  const loadBootstrapStatus = useCallback(async () => {
     setLoadingStatus(true);
     setStatusError('');
     setErrorMsg('');
-    setFirebaseAdminVerified(false);
-    setFirebaseRecord(null);
+    setProviderNotEnabled(false);
 
     try {
-      const data = await getAdminStatus();
-      setAuthMode(data.mode);
-
-      if (data.mode === 'express') {
-        setNeedsSetup(!data.configured);
-      } else {
-        // In Firebase server mode (shared/static PWA), if admin Google session is already active,
-        // verify permission against Firestore right away before asking for the admin passcode.
-        if (auth.currentUser && auth.currentUser.emailVerified) {
-          try {
-            await loadFirebasePasscodeState();
-          } catch {
-            // If current Google user is not an admin, sign out and prompt Google admin sign-in
-            await signOut(auth).catch(() => {});
-            setFirebaseAdminVerified(false);
-          }
-        }
-      }
+      const { initialized } = await checkAdminBootstrapStatus();
+      setNeedsSetup(!initialized);
     } catch (err) {
       const msg =
         err instanceof AdminApiError
@@ -128,122 +69,63 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
     } finally {
       setLoadingStatus(false);
     }
-  }, [loadFirebasePasscodeState]);
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
+    setUsername('');
+    setDisplayName('');
     setPassword('');
     setConfirmPassword('');
+    setShowPassword(false);
     setErrorMsg('');
     setStatusError('');
-    setUnauthorizedHost(null);
-    setCopiedHost(false);
-    setVerifiedServerToken(null);
-    void loadStatus();
-  }, [isOpen, loadStatus]);
+    setProviderNotEnabled(false);
+    void loadBootstrapStatus();
+  }, [isOpen, loadBootstrapStatus]);
 
-  const handleCopyHost = async () => {
-    if (!unauthorizedHost) return;
-    try {
-      await navigator.clipboard.writeText(unauthorizedHost);
-      setCopiedHost(true);
-      setTimeout(() => setCopiedHost(false), 2000);
-    } catch {
-      // Clipboard API unavailable in non-secure context
-    }
-  };
+  const normalizedPreview = normalizeAdminUsername(username);
+  const showNormalizedHint =
+    needsSetup && username.trim().length > 0 && normalizedPreview !== username.trim();
 
-  // Firebase mode Step 1: verify authorized admin identity with Google + Firestore Security Rules
-  const handleFirebaseAdminSignIn = async () => {
-    setErrorMsg('');
-    setUnauthorizedHost(null);
-    setLinkingDb(true);
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (!result.user.emailVerified) {
-        await signOut(auth).catch(() => {});
-        setErrorMsg('A conta selecionada precisa possuir e-mail verificado.');
-        return;
-      }
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        setGoogleAccessToken(credential.accessToken);
-      }
-      await loadFirebasePasscodeState();
-    } catch (err: unknown) {
-      if (err instanceof AdminApiError) {
-        await signOut(auth).catch(() => {});
-        setErrorMsg(err.message);
-      } else {
-        const code = (err as { code?: string })?.code;
-        if (code === 'auth/popup-closed-by-user') {
-          setErrorMsg('Autenticação cancelada. Confirme sua conta administradora para continuar.');
-        } else if (code === 'auth/popup-blocked') {
-          setErrorMsg(
-            'O navegador bloqueou a janela de login Google. Permita pop-ups para este site e tente novamente.'
-          );
-        } else if (code === 'auth/unauthorized-domain') {
-          const host = typeof window !== 'undefined' ? window.location.hostname : '';
-          setUnauthorizedHost(host || 'este domínio');
-          setErrorMsg(
-            `O domínio "${host}" ainda não está autorizado no Firebase Authentication do projeto.`
-          );
-        } else {
-          setErrorMsg('Não foi possível validar a conta administradora.');
-        }
-      }
-    } finally {
-      setLinkingDb(false);
-    }
-  };
-
-  // Express mode Step 1 OR Firebase mode Step 2: validate single admin password
-  const handlePasswordSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setProviderNotEnabled(false);
 
     const now = Date.now();
-    if (authMode === 'firebase' && now < cooldownUntil) {
+    if (!needsSetup && now < cooldownUntil) {
       const remaining = Math.ceil((cooldownUntil - now) / 1000);
       setErrorMsg(`Muitas tentativas inválidas. Aguarde ${remaining}s para tentar novamente.`);
       return;
     }
 
     setSubmitting(true);
-
     try {
-      if (authMode === 'express') {
-        const data = needsSetup
-          ? await setupAdminPassword(password, confirmPassword)
-          : await loginAdminPassword(password);
+      const result = needsSetup
+        ? await registerFirstAdmin({
+            username,
+            displayName,
+            password,
+            confirmPassword,
+          })
+        : await loginAdminWithCredentials({
+            username,
+            password,
+          });
 
-        const token = String(data.token || '');
-        if (!token) {
-          setErrorMsg('Resposta inválida do servidor.');
-          return;
-        }
-
-        if (auth.currentUser && auth.currentUser.emailVerified) {
-          onAuthenticated(token);
-        } else {
-          setVerifiedServerToken(token);
-        }
-      } else {
-        // Firebase server-enforced mode
-        const data = needsSetup
-          ? await setupFirebaseAdminPasscode(password, confirmPassword)
-          : await verifyFirebaseAdminPasscode(password, firebaseRecord!);
-
-        setFailedAttempts(0);
-        setCooldownUntil(0);
-        onAuthenticated(data.token);
-      }
+      setFailedAttempts(0);
+      setCooldownUntil(0);
+      onAuthenticated(result.token, result.admin);
     } catch (err) {
       if (err instanceof AdminApiError) {
-        if (err.needsSetup) {
-          setNeedsSetup(true);
+        if (err.providerNotEnabled) {
+          setProviderNotEnabled(true);
         }
-        if (authMode === 'firebase' && err.status === 401) {
+        if (err.needsSetup === false) {
+          setNeedsSetup(false);
+        }
+        if (!needsSetup && err.status === 401) {
           const nextFails = failedAttempts + 1;
           setFailedAttempts(nextFails);
           if (nextFails >= 5) {
@@ -255,106 +137,16 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
         }
         setErrorMsg(err.message);
       } else {
-        setErrorMsg('Erro inesperado ao validar a senha administrativa.');
+        setErrorMsg('Erro inesperado ao validar o login administrativo.');
       }
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Express mode Step 2: link Google admin account for Firestore writes
-  const handleAuthorizeDatabase = async () => {
-    if (!verifiedServerToken) return;
-    setErrorMsg('');
-    setUnauthorizedHost(null);
-    setLinkingDb(true);
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      if (!result.user.emailVerified) {
-        setErrorMsg('A conta selecionada precisa possuir e-mail verificado para gravar no banco.');
-        return;
-      }
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      if (credential?.accessToken) {
-        setGoogleAccessToken(credential.accessToken);
-      }
-      onAuthenticated(verifiedServerToken);
-    } catch (err: unknown) {
-      const code = (err as { code?: string })?.code;
-      if (code === 'auth/popup-closed-by-user') {
-        setErrorMsg('Autorização cancelada. Conclua a confirmação para habilitar gravações no banco.');
-      } else if (code === 'auth/popup-blocked') {
-        setErrorMsg(
-          'O navegador bloqueou a janela de autorização Google. Permita pop-ups para este site e tente novamente.'
-        );
-      } else if (code === 'auth/unauthorized-domain') {
-        const host = typeof window !== 'undefined' ? window.location.hostname : '';
-        setUnauthorizedHost(host || 'este domínio');
-        setErrorMsg(
-          `O domínio "${host}" ainda não está autorizado no Firebase Authentication do projeto.`
-        );
-      } else {
-        setErrorMsg('Não foi possível autorizar a conta administradora do banco de dados.');
-      }
-    } finally {
-      setLinkingDb(false);
-    }
-  };
-
-  const handleCancel = () => {
-    if (verifiedServerToken) {
-      void logoutAdminToken(verifiedServerToken);
-    }
-    if (authMode === 'firebase' && auth.currentUser) {
-      void signOut(auth).catch(() => {});
-    }
-    onClose();
-  };
-
-  const needsFirebaseSignInFirst = authMode === 'firebase' && !firebaseAdminVerified;
-
-  const modalTitle = verifiedServerToken
-    ? 'Autorizar Banco Online'
-    : needsFirebaseSignInFirst
-    ? 'Acesso à Área Administrativa'
-    : needsSetup
-    ? 'Configurar Senha Administrativa'
+  const modalTitle = needsSetup
+    ? 'Criar Primeiro Administrador'
     : 'Acesso à Área Administrativa';
-
-  const renderUnauthorizedDomainBox = () =>
-    unauthorizedHost && (
-      <div className="pt-2.5 border-t border-[#F87171]/25 space-y-2 text-[#FECACA]/90">
-        <p>
-          Adicione este domínio em{' '}
-          <strong className="text-[#F4E6C4]">
-            Firebase Console → Authentication → Settings → Domínios autorizados
-          </strong>
-          :
-        </p>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 px-2.5 py-1.5 bg-[#080B09]/80 border border-[#F87171]/30 rounded-lg font-mono text-[11px] text-[#F4E6C4] break-all select-all">
-            {unauthorizedHost}
-          </code>
-          <button
-            type="button"
-            onClick={() => void handleCopyHost()}
-            className="btl-btn btl-btn-secondary min-h-[34px] px-2.5 py-1 text-[11px] shrink-0"
-          >
-            {copiedHost ? <Check className="w-3.5 h-3.5 text-[#A8D8BE]" /> : <Copy className="w-3.5 h-3.5" />}
-            <span>{copiedHost ? 'Copiado' : 'Copiar'}</span>
-          </button>
-        </div>
-        <a
-          href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/settings`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 font-semibold text-[#E5C17B] hover:text-[#F4E6C4] hover:underline"
-        >
-          <span>Abrir Domínios Autorizados no Firebase Console</span>
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
-      </div>
-    );
 
   return (
     <AnimatePresence>
@@ -378,7 +170,11 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
           >
             <div className="px-6 py-4 bg-[#0B120E]/90 border-b border-[#EBE0C8]/12 flex items-center justify-between gap-4">
               <div className="flex items-center gap-2.5">
-                <Lock className="w-4 h-4 text-[#E5C17B]" />
+                {needsSetup ? (
+                  <UserPlus className="w-4 h-4 text-[#E5C17B]" />
+                ) : (
+                  <Lock className="w-4 h-4 text-[#E5C17B]" />
+                )}
                 <h2
                   id="admin-auth-title"
                   className="font-display text-base font-semibold text-[#F4E6C4]"
@@ -388,7 +184,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
               </div>
               <button
                 type="button"
-                onClick={handleCancel}
+                onClick={onClose}
                 className="min-w-[36px] min-h-[36px] flex items-center justify-center text-[#98A89F] hover:text-[#F4E6C4] rounded-lg transition-colors cursor-pointer"
                 aria-label="Fechar janela de autenticação"
               >
@@ -399,7 +195,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
             <div className="p-6 space-y-5">
               {loadingStatus ? (
                 <div className="py-6 text-center text-sm text-[#98A89F]">
-                  Verificando política de acesso no servidor...
+                  Verificando acesso administrativo...
                 </div>
               ) : statusError ? (
                 <div className="space-y-4">
@@ -413,14 +209,14 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   <div className="flex items-center justify-end gap-2.5">
                     <button
                       type="button"
-                      onClick={handleCancel}
+                      onClick={onClose}
                       className="btl-btn btl-btn-secondary text-sm"
                     >
                       Fechar
                     </button>
                     <button
                       type="button"
-                      onClick={() => void loadStatus()}
+                      onClick={() => void loadBootstrapStatus()}
                       className="btl-btn btl-btn-primary text-sm"
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -428,119 +224,107 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                     </button>
                   </div>
                 </div>
-              ) : needsFirebaseSignInFirst ? (
-                /* Firebase Mode Step 1: Verify Authorized Admin Account against Firestore Security Rules */
-                <div className="space-y-4">
-                  <p className="text-sm text-[#98A89F] leading-relaxed">
-                    Para acessar a área de edição com segurança validada pelo banco de dados, confirme primeiro sua conta administradora e em seguida informe a senha única administrativa.
-                  </p>
-
-                  {errorMsg && (
-                    <div
-                      role="alert"
-                      className="space-y-2.5 p-3.5 rounded-xl bg-[#7F1D1D]/24 border border-[#F87171]/35 text-xs text-[#FECACA]"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FCA5A5]" />
-                        <span>{errorMsg}</span>
-                      </div>
-                      {renderUnauthorizedDomainBox()}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      disabled={linkingDb}
-                      onClick={() => void handleFirebaseAdminSignIn()}
-                      className="w-full min-h-[44px] px-4 py-2 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-sm inline-flex items-center justify-center gap-2.5 border border-[#DADCE0] shadow-sm transition-colors cursor-pointer"
-                    >
-                      <GoogleBrandIcon className="w-[18px] h-[18px] shrink-0" />
-                      <span>
-                        {linkingDb ? 'Validando conta...' : 'Entrar com o Google'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      className="btl-btn btl-btn-secondary w-full min-h-[40px] text-sm"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-              ) : verifiedServerToken ? (
-                /* Express Mode Step 2: Link database write permission */
-                <div className="space-y-4">
-                  <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#2D5A43]/24 border border-[#83B499]/35 text-xs text-[#A8D8BE]">
-                    <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>
-                      Senha administrativa validada no servidor. Para gravar alterações no banco de dados com segurança, confirme a credencial administradora.
-                    </span>
-                  </div>
-
-                  {errorMsg && (
-                    <div
-                      role="alert"
-                      className="space-y-2.5 p-3.5 rounded-xl bg-[#7F1D1D]/24 border border-[#F87171]/35 text-xs text-[#FECACA]"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FCA5A5]" />
-                        <span>{errorMsg}</span>
-                      </div>
-                      {renderUnauthorizedDomainBox()}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-2.5 pt-1">
-                    <button
-                      type="button"
-                      disabled={linkingDb}
-                      onClick={() => void handleAuthorizeDatabase()}
-                      className="w-full min-h-[44px] px-4 py-2 rounded-lg bg-white text-[#1F1F1F] hover:bg-[#F3F4F6] disabled:opacity-60 font-medium text-sm inline-flex items-center justify-center gap-2.5 border border-[#DADCE0] shadow-sm transition-colors cursor-pointer"
-                    >
-                      <GoogleBrandIcon className="w-[18px] h-[18px] shrink-0" />
-                      <span>
-                        {linkingDb ? 'Confirmando...' : 'Entrar com o Google'}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      className="btl-btn btl-btn-secondary w-full min-h-[40px] text-sm"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
               ) : (
-                /* Single Administrative Password Form (Express Mode Step 1 OR Firebase Mode Step 2) */
-                <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                  {authMode === 'firebase' && (
-                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#2D5A43]/24 border border-[#83B499]/35 text-xs text-[#A8D8BE]">
-                      <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span>
-                        Conta administradora confirmada.{' '}
-                        {needsSetup
-                          ? 'Defina agora a senha única administrativa.'
-                          : 'Informe a senha única administrativa para liberar a edição.'}
-                      </span>
-                    </div>
-                  )}
-
+                <form onSubmit={handleSubmit} className="space-y-4">
                   <p className="text-sm text-[#98A89F] leading-relaxed">
                     {needsSetup
-                      ? 'Defina a senha única administrativa. Ela será armazenada apenas como hash criptográfico seguro e exigida todas as vezes que alguém entrar na área de edição.'
-                      : 'Informe a senha única de administrador. A sessão é encerrada automaticamente ao sair da área administrativa.'}
+                      ? 'Defina o primeiro nome de usuário e senha de administrador. Depois de entrar, você poderá criar outros logins e senhas na aba Acessos.'
+                      : 'Informe seu nome de usuário e senha para entrar na área administrativa.'}
                   </p>
 
                   {errorMsg && (
                     <div
                       role="alert"
-                      className="flex items-start gap-2.5 p-3 rounded-xl bg-[#7F1D1D]/24 border border-[#F87171]/35 text-xs text-[#FECACA]"
+                      className="space-y-2.5 p-3.5 rounded-xl bg-[#7F1D1D]/24 border border-[#F87171]/35 text-xs text-[#FECACA]"
                     >
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FCA5A5]" />
-                      <span>{errorMsg}</span>
+                      <div className="flex items-start gap-2.5">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FCA5A5]" />
+                        <span>{errorMsg}</span>
+                      </div>
+
+                      {providerNotEnabled && (
+                        <div className="pt-2.5 border-t border-[#F87171]/25 space-y-2 text-[#FECACA]/90">
+                          <p>
+                            Para habilitar login por usuário e senha, ative uma única vez no Firebase
+                            Console:
+                          </p>
+                          <ol className="list-decimal list-inside space-y-1 text-[11px]">
+                            <li>
+                              Abra <strong className="text-[#F4E6C4]">Authentication → Sign-in method</strong>
+                            </li>
+                            <li>
+                              Clique em <strong className="text-[#F4E6C4]">E-mail/senha</strong>, ative a
+                              primeira chave e clique em <strong className="text-[#F4E6C4]">Salvar</strong>
+                            </li>
+                            <li>Volte aqui e tente entrar novamente</li>
+                          </ol>
+                          <a
+                            href={`https://console.firebase.google.com/project/${firebaseProjectId}/authentication/providers`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 font-semibold text-[#E5C17B] hover:text-[#F4E6C4] hover:underline pt-0.5"
+                          >
+                            <span>Abrir Firebase Authentication</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor="admin-username-input"
+                      className="block text-xs font-semibold text-[#C8D4CD]"
+                    >
+                      Nome de usuário
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        id="admin-username-input"
+                        type="text"
+                        required
+                        minLength={3}
+                        maxLength={32}
+                        autoComplete="username"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        autoFocus
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder={needsSetup ? 'Ex: maycon ou sgt.paulo' : 'Digite seu usuário'}
+                        className="btl-input min-h-[44px] pl-10 pr-4 py-2"
+                      />
+                    </div>
+                    {showNormalizedHint && (
+                      <p className="text-[11px] text-[#98A89F]">
+                        Login salvo como:{' '}
+                        <span className="font-mono text-[#E5C17B]">{normalizedPreview}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {needsSetup && (
+                    <div className="space-y-1.5">
+                      <label
+                        htmlFor="admin-displayname-input"
+                        className="block text-xs font-semibold text-[#C8D4CD]"
+                      >
+                        Nome de exibição{' '}
+                        <span className="font-normal text-[#7D8F85]">(opcional)</span>
+                      </label>
+                      <input
+                        id="admin-displayname-input"
+                        type="text"
+                        maxLength={80}
+                        autoComplete="name"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        placeholder="Ex: 3º Sgt Maycon"
+                        className="btl-input min-h-[44px] px-3.5 py-2"
+                      />
                     </div>
                   )}
 
@@ -549,25 +333,34 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       htmlFor="admin-password-input"
                       className="block text-xs font-semibold text-[#C8D4CD]"
                     >
-                      {needsSetup
-                        ? 'Nova senha administrativa (mín. 6 caracteres)'
-                        : 'Senha administrativa'}
+                      {needsSetup ? 'Senha (mín. 6 caracteres)' : 'Senha'}
                     </label>
                     <div className="relative">
                       <KeyRound className="w-4 h-4 text-[#C8A461]/80 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <input
                         id="admin-password-input"
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         required
                         minLength={needsSetup ? 6 : 1}
                         maxLength={128}
                         autoComplete={needsSetup ? 'new-password' : 'current-password'}
-                        autoFocus
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Digite a senha..."
-                        className="btl-input min-h-[44px] pl-10 pr-4 py-2"
+                        placeholder="Digite a senha"
+                        className="btl-input min-h-[44px] pl-10 pr-11 py-2"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-[#98A89F] hover:text-[#F4E6C4] cursor-pointer"
+                        aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -577,18 +370,18 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                         htmlFor="admin-password-confirm"
                         className="block text-xs font-semibold text-[#C8D4CD]"
                       >
-                        Confirmar senha administrativa
+                        Confirmar senha
                       </label>
                       <input
                         id="admin-password-confirm"
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         required
                         minLength={6}
                         maxLength={128}
                         autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Repita a senha..."
+                        placeholder="Repita a senha"
                         className="btl-input min-h-[44px] px-3.5 py-2"
                       />
                     </div>
@@ -597,7 +390,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   <div className="flex items-center justify-end gap-2.5 pt-2">
                     <button
                       type="button"
-                      onClick={handleCancel}
+                      onClick={onClose}
                       className="btl-btn btl-btn-secondary text-sm"
                     >
                       Cancelar
@@ -610,7 +403,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                       {submitting
                         ? 'Validando...'
                         : needsSetup
-                        ? 'Salvar e entrar'
+                        ? 'Criar acesso e entrar'
                         : 'Entrar'}
                     </button>
                   </div>

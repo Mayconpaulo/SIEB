@@ -1,410 +1,670 @@
-import { doc, getDocFromServer, serverTimestamp, setDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import {
+  createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  signInWithEmailAndPassword,
+  signOut,
+  updatePassword,
+} from 'firebase/auth';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocFromServer,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
+import type { AdminAccount } from '../types/schedule';
+import {
+  auth,
+  clearGoogleSheetsSession,
+  db,
+  getAdminCreatorAuth,
+  handleFirestoreError,
+  OperationType,
+} from './firebase';
 
-export type AdminAuthMode = 'express' | 'firebase';
+const ADMIN_EMAIL_DOMAIN = 'admin.sieb.local';
+const ADMIN_SESSION_PREFIX = 'adm_';
+const USERNAME_REGEX = /^[a-z0-9._-]{3,32}$/;
 
-export interface AdminStatusResponse {
-  mode: AdminAuthMode;
-  configured: boolean;
-  source: 'env' | 'claimed' | 'firestore' | 'none';
-}
-
-export interface AdminLoginResponse {
-  authenticated: boolean;
+export interface AdminLoginResult {
+  authenticated: true;
   token: string;
-  expiresAt: number;
-  source: 'env' | 'claimed' | 'firestore';
-}
-
-export interface FirebasePasscodeRecord {
-  id: 'passcode';
-  algorithm: 'PBKDF2-SHA256';
-  iterations: number;
-  salt: string;
-  hash: string;
+  admin: AdminAccount;
 }
 
 export class AdminApiError extends Error {
   status: number;
+  providerNotEnabled?: boolean;
   needsSetup?: boolean;
 
-  constructor(message: string, status = 0, needsSetup?: boolean) {
+  constructor(
+    message: string,
+    status = 0,
+    options?: { providerNotEnabled?: boolean; needsSetup?: boolean }
+  ) {
     super(message);
     this.name = 'AdminApiError';
     this.status = status;
-    this.needsSetup = needsSetup;
+    this.providerNotEnabled = options?.providerNotEnabled;
+    this.needsSetup = options?.needsSetup;
   }
 }
 
-const PBKDF2_ITERATIONS = 150000;
-const FIREBASE_TOKEN_PREFIX = 'fb_';
-const FIREBASE_SESSION_TTL_MS = 2 * 60 * 60 * 1000;
+function formatTimestamp(val: unknown): string {
+  if (val instanceof Timestamp) {
+    return val.toDate().toISOString();
+  }
+  if (typeof val === 'string') {
+    return val;
+  }
+  return new Date().toISOString();
+}
 
-function bytesToHex(bytes: Uint8Array): string {
-  return Array.from(bytes)
+function generateSessionToken(): string {
+  const arr = new Uint8Array(24);
+  crypto.getRandomValues(arr);
+  const hex = Array.from(arr)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+  return `${ADMIN_SESSION_PREFIX}${hex}`;
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  const len = Math.floor(hex.length / 2);
-  const out = new Uint8Array(len);
-  for (let i = 0; i < len; i += 1) {
-    out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+function createAuditLogId(): string {
+  return `log_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Normalizes a typed login username to lowercase ASCII slug form */
+export function normalizeAdminUsername(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '.');
+}
+
+export function isValidAdminUsername(username: string): boolean {
+  return USERNAME_REGEX.test(username);
+}
+
+/** Internal synthetic identifier used strictly with Firebase Auth Email/Password */
+export function usernameToAuthEmail(username: string): string {
+  return `${normalizeAdminUsername(username)}@${ADMIN_EMAIL_DOMAIN}`;
+}
+
+function parseAdminDoc(uid: string, d: Record<string, unknown>): AdminAccount {
+  return {
+    uid: String(d.uid || uid),
+    username: String(d.username || ''),
+    displayName: String(d.displayName || d.username || 'Administrador'),
+    role: 'admin',
+    active: Boolean(d.active),
+    createdBy: String(d.createdBy || uid),
+    createdAt: formatTimestamp(d.createdAt),
+    updatedAt: formatTimestamp(d.updatedAt),
+  };
+}
+
+function mapFirebaseAuthError(err: unknown, mode: 'login' | 'register' | 'password'): AdminApiError {
+  const code = (err as { code?: string })?.code ?? '';
+
+  if (
+    code === 'auth/operation-not-allowed' ||
+    code === 'auth/configuration-not-found' ||
+    code === 'auth/admin-restricted-operation'
+  ) {
+    return new AdminApiError(
+      'O provedor "E-mail/senha" ainda não foi ativado no Firebase Authentication deste projeto.',
+      403,
+      { providerNotEnabled: true }
+    );
   }
-  return out;
-}
 
-function constantTimeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  if (code === 'auth/too-many-requests') {
+    return new AdminApiError(
+      'Muitas tentativas seguidas. Aguarde alguns instantes e tente novamente.',
+      429
+    );
   }
-  return diff === 0;
-}
 
-function generateRandomHex(byteLength: number): string {
-  const arr = new Uint8Array(byteLength);
-  crypto.getRandomValues(arr);
-  return bytesToHex(arr);
-}
+  if (code === 'auth/network-request-failed') {
+    return new AdminApiError(
+      'Sem conexão com o servidor de autenticação. Verifique sua internet e tente novamente.',
+      0
+    );
+  }
 
-async function derivePbkdf2Hex(
-  password: string,
-  saltHex: string,
-  iterations: number
-): Promise<string> {
-  const enc = new TextEncoder();
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-  const saltBytes = hexToBytes(saltHex);
-  const saltBuffer = saltBytes.buffer.slice(
-    saltBytes.byteOffset,
-    saltBytes.byteOffset + saltBytes.byteLength
-  ) as ArrayBuffer;
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: 'PBKDF2',
-      salt: saltBuffer,
-      iterations,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    256
-  );
-  return bytesToHex(new Uint8Array(derivedBits));
-}
-
-async function fetchJsonWithRetry<T>(
-  url: string,
-  options: RequestInit = {},
-  maxRetries = 1
-): Promise<T> {
-  let attempt = 0;
-
-  while (true) {
-    try {
-      const headers = new Headers(options.headers);
-      headers.set('Accept', 'application/json');
-
-      const res = await fetch(url, {
-        ...options,
-        headers,
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
-
-      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < maxRetries) {
-        attempt += 1;
-        await new Promise((resolve) => setTimeout(resolve, 650));
-        continue;
-      }
-
-      const rawText = await res.text();
-      let parsed: Record<string, unknown> | null = null;
-      if (rawText.trim().length > 0) {
-        try {
-          parsed = JSON.parse(rawText) as Record<string, unknown>;
-        } catch {
-          parsed = null;
-        }
-      }
-
-      if (!res.ok) {
-        const backendError =
-          parsed && typeof parsed.error === 'string' && parsed.error.trim().length > 0
-            ? parsed.error
-            : res.status === 502 || res.status === 503 || res.status === 504
-            ? 'O servidor está reiniciando no momento. Aguarde alguns segundos e tente novamente.'
-            : `O servidor retornou erro HTTP ${res.status} ao validar o acesso administrativo.`;
-        const needsSetup = Boolean(parsed?.needsSetup);
-        throw new AdminApiError(backendError, res.status, needsSetup);
-      }
-
-      if (!parsed) {
-        throw new AdminApiError(
-          'O servidor respondeu em um formato inesperado.',
-          res.status
-        );
-      }
-
-      return parsed as T;
-    } catch (err) {
-      if (err instanceof AdminApiError) {
-        throw err;
-      }
-
-      if (attempt < maxRetries) {
-        attempt += 1;
-        await new Promise((resolve) => setTimeout(resolve, 650));
-        continue;
-      }
-
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        throw new AdminApiError(
-          'Sem conexão com a internet. Conecte-se à rede para acessar a área administrativa.'
-        );
-      }
-
-      throw new AdminApiError(
-        'Não foi possível comunicar com o servidor de autenticação. Tente novamente.'
+  if (mode === 'register') {
+    if (code === 'auth/email-already-in-use') {
+      return new AdminApiError(
+        'Este nome de usuário já está em uso. Escolha outro nome de usuário.',
+        409
       );
     }
+    if (code === 'auth/weak-password') {
+      return new AdminApiError('A senha deve ter pelo menos 6 caracteres.', 400);
+    }
+    if (code === 'auth/invalid-email') {
+      return new AdminApiError(
+        'Nome de usuário inválido. Use apenas letras, números, ponto, traço ou sublinhado.',
+        400
+      );
+    }
+    return new AdminApiError('Não foi possível criar o acesso administrativo. Tente novamente.', 500);
   }
+
+  if (mode === 'password') {
+    if (
+      code === 'auth/wrong-password' ||
+      code === 'auth/invalid-credential' ||
+      code === 'auth/invalid-login-credentials'
+    ) {
+      return new AdminApiError('A senha atual informada está incorreta.', 401);
+    }
+    if (code === 'auth/weak-password') {
+      return new AdminApiError('A nova senha deve ter pelo menos 6 caracteres.', 400);
+    }
+    if (code === 'auth/requires-recent-login') {
+      return new AdminApiError(
+        'Sua sessão precisa ser renovada. Saia e entre novamente antes de trocar a senha.',
+        401
+      );
+    }
+    return new AdminApiError('Não foi possível atualizar a senha agora.', 500);
+  }
+
+  // mode === 'login'
+  if (
+    code === 'auth/invalid-credential' ||
+    code === 'auth/invalid-login-credentials' ||
+    code === 'auth/user-not-found' ||
+    code === 'auth/wrong-password' ||
+    code === 'auth/invalid-email'
+  ) {
+    return new AdminApiError('Nome de usuário ou senha incorretos.', 401);
+  }
+
+  if (code === 'auth/user-disabled') {
+    return new AdminApiError('Este acesso administrativo foi desativado.', 403);
+  }
+
+  return new AdminApiError('Não foi possível validar o login administrativo.', 500);
 }
 
 /**
- * Probes the Express backend first. If the app is being served from a static host
- * (such as the shared preview URL or an installed PWA where /api/* returns 404/HTML),
- * seamlessly switches to Firebase Server-Verified Admin Mode backed by Firestore Security Rules.
+ * Checks whether the first administrator has already been created in Firestore.
+ * Uses /admin_security/bootstrap which contains zero PII.
  */
-export async function getAdminStatus(): Promise<AdminStatusResponse> {
+export async function checkAdminBootstrapStatus(): Promise<{ initialized: boolean }> {
   try {
-    const res = await fetch('/api/admin/status', {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-
-    if (res.ok) {
-      const text = await res.text();
-      try {
-        const parsed = JSON.parse(text) as { configured?: boolean; source?: 'env' | 'claimed' | 'none' };
-        if (typeof parsed.configured === 'boolean') {
-          return {
-            mode: 'express',
-            configured: parsed.configured,
-            source: parsed.source ?? (parsed.configured ? 'env' : 'none'),
-          };
-        }
-      } catch {
-        // Non-JSON response (SPA HTML fallback on static hosting) -> fall back to Firebase server mode
-      }
-    }
-
-    // HTTP 404 / 405 / non-JSON indicates static hosting without Express API
-    if (res.status === 404 || res.status === 405 || res.ok) {
-      return {
-        mode: 'firebase',
-        configured: false,
-        source: 'firestore',
-      };
-    }
-
-    if (res.status === 502 || res.status === 503 || res.status === 504) {
-      throw new AdminApiError(
-        'O servidor está reiniciando no momento. Aguarde alguns segundos e tente novamente.',
-        res.status
-      );
-    }
-
-    return {
-      mode: 'firebase',
-      configured: false,
-      source: 'firestore',
-    };
-  } catch (err) {
-    if (err instanceof AdminApiError) {
-      throw err;
-    }
+    const snap = await getDocFromServer(doc(db, 'admin_security', 'bootstrap'));
+    return { initialized: snap.exists() && snap.data()?.initialized === true };
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code ?? '';
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       throw new AdminApiError(
         'Sem conexão com a internet. Conecte-se à rede para acessar a área administrativa.'
       );
     }
-    // If Express API is unreachable on static deployment, use Firebase server-enforced rules
-    return {
-      mode: 'firebase',
-      configured: false,
-      source: 'firestore',
-    };
-  }
-}
-
-export async function setupAdminPassword(
-  password: string,
-  confirmPassword: string
-): Promise<AdminLoginResponse> {
-  return fetchJsonWithRetry<AdminLoginResponse>('/api/admin/setup', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password, confirmPassword }),
-  });
-}
-
-export async function loginAdminPassword(password: string): Promise<AdminLoginResponse> {
-  return fetchJsonWithRetry<AdminLoginResponse>('/api/admin/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password }),
-  });
-}
-
-// --- Firebase Server-Enforced Admin Mode (Used when served statically / Shared PWA URL) ---
-
-export async function fetchFirebasePasscodeRecord(): Promise<FirebasePasscodeRecord | null> {
-  if (!auth.currentUser || !auth.currentUser.emailVerified) {
-    throw new AdminApiError('Autentique-se primeiro com a conta Google administradora.');
-  }
-
-  try {
-    const snap = await getDocFromServer(doc(db, 'admin_security', 'passcode'));
-    if (!snap.exists()) {
-      return null;
-    }
-    const d = snap.data();
-    return {
-      id: 'passcode',
-      algorithm: 'PBKDF2-SHA256',
-      iterations: Number(d.iterations) || PBKDF2_ITERATIONS,
-      salt: String(d.salt || ''),
-      hash: String(d.hash || ''),
-    };
-  } catch (err: unknown) {
-    const code = (err as { code?: string })?.code ?? '';
-    const msg = err instanceof Error ? err.message : '';
-    if (code === 'permission-denied' || msg.includes('Missing or insufficient permissions')) {
+    if (code === 'permission-denied') {
       throw new AdminApiError(
-        'A conta Google selecionada não possui permissão de administrador no banco de dados.',
+        'As regras do banco de dados recusaram a verificação inicial. Tente novamente em instantes.',
         403
       );
     }
     throw new AdminApiError(
-      'Não foi possível consultar a configuração de segurança no banco online. Verifique sua conexão.'
+      'Não foi possível consultar o servidor de autenticação. Verifique sua conexão e tente novamente.'
     );
   }
 }
 
-export async function setupFirebaseAdminPasscode(
-  password: string,
-  confirmPassword: string
-): Promise<AdminLoginResponse> {
-  const trimmed = password.trim();
-  const confirmTrimmed = confirmPassword.trim();
-  if (trimmed.length < 6 || trimmed.length > 128) {
-    throw new AdminApiError('A senha administrativa deve ter entre 6 e 128 caracteres.', 400);
+/**
+ * One-time registration of the first administrator using strictly username + password.
+ * Atomically writes /admin_security/bootstrap and /admins/{uid} in a single batch so no
+ * subsequent user can hijack bootstrap.
+ */
+export async function registerFirstAdmin(params: {
+  username: string;
+  displayName?: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<AdminLoginResult> {
+  const username = normalizeAdminUsername(params.username);
+  const displayName = (params.displayName?.trim() || username).slice(0, 80);
+  const password = params.password;
+  const confirmPassword = params.confirmPassword;
+
+  if (!isValidAdminUsername(username)) {
+    throw new AdminApiError(
+      'O nome de usuário deve ter entre 3 e 32 caracteres (apenas letras, números, ponto, traço ou sublinhado).',
+      400
+    );
   }
-  if (trimmed !== confirmTrimmed) {
+  if (displayName.length < 2) {
+    throw new AdminApiError('Informe um nome válido (mínimo 2 caracteres).', 400);
+  }
+  if (password.length < 6 || password.length > 128) {
+    throw new AdminApiError('A senha deve ter entre 6 e 128 caracteres.', 400);
+  }
+  if (password !== confirmPassword) {
     throw new AdminApiError('A confirmação da senha não confere.', 400);
   }
-  if (!auth.currentUser || !auth.currentUser.emailVerified) {
-    throw new AdminApiError('Conta Google administradora não autenticada.', 401);
+
+  // Re-verify bootstrap has not already been claimed before creating the Auth user
+  const status = await checkAdminBootstrapStatus();
+  if (status.initialized) {
+    throw new AdminApiError(
+      'O primeiro administrador já foi cadastrado. Faça login com seu usuário e senha.',
+      409,
+      { needsSetup: false }
+    );
   }
 
-  const salt = generateRandomHex(16); // 32 hex chars
-  const hash = await derivePbkdf2Hex(trimmed, salt, PBKDF2_ITERATIONS); // 64 hex chars
+  const authEmail = usernameToAuthEmail(username);
+  let createdUser: (typeof auth)['currentUser'] = null;
 
   try {
-    await setDoc(doc(db, 'admin_security', 'passcode'), {
-      id: 'passcode',
-      algorithm: 'PBKDF2-SHA256',
-      iterations: PBKDF2_ITERATIONS,
-      salt,
-      hash,
+    const credential = await createUserWithEmailAndPassword(auth, authEmail, password);
+    createdUser = credential.user;
+  } catch (err) {
+    throw mapFirebaseAuthError(err, 'register');
+  }
+
+  try {
+    const batch = writeBatch(db);
+    const bootstrapRef = doc(db, 'admin_security', 'bootstrap');
+    const adminRef = doc(db, 'admins', createdUser.uid);
+
+    batch.set(bootstrapRef, {
+      id: 'bootstrap',
+      initialized: true,
+      createdAt: serverTimestamp(),
+    });
+    batch.set(adminRef, {
+      uid: createdUser.uid,
+      username,
+      displayName,
+      role: 'admin',
+      active: true,
+      createdBy: createdUser.uid,
+      createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
-  } catch (err: unknown) {
+
+    await batch.commit();
+
+    const nowIso = new Date().toISOString();
+    return {
+      authenticated: true,
+      token: generateSessionToken(),
+      admin: {
+        uid: createdUser.uid,
+        username,
+        displayName,
+        role: 'admin',
+        active: true,
+        createdBy: createdUser.uid,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      },
+    };
+  } catch (err) {
+    // Roll back newly created auth account so retry with the same username is never blocked
+    try {
+      await deleteUser(createdUser);
+    } catch {
+      await signOut(auth).catch(() => {});
+    }
     const code = (err as { code?: string })?.code ?? '';
     if (code === 'permission-denied') {
       throw new AdminApiError(
-        'Sem permissão para definir a senha administrativa com esta conta Google.',
+        'O primeiro administrador já foi cadastrado anteriormente. Faça login com usuário e senha.',
+        409
+      );
+    }
+    throw new AdminApiError(
+      'Não foi possível concluir o cadastro do primeiro administrador. Tente novamente.'
+    );
+  }
+}
+
+/**
+ * Authenticates an administrator using strictly username + password (no Google login).
+ */
+export async function loginAdminWithCredentials(params: {
+  username: string;
+  password: string;
+}): Promise<AdminLoginResult> {
+  const username = normalizeAdminUsername(params.username);
+  const password = params.password;
+
+  if (!isValidAdminUsername(username) || !password || password.length > 128) {
+    throw new AdminApiError('Nome de usuário ou senha incorretos.', 401);
+  }
+
+  const authEmail = usernameToAuthEmail(username);
+  let uid = '';
+
+  try {
+    const credential = await signInWithEmailAndPassword(auth, authEmail, password);
+    uid = credential.user.uid;
+  } catch (err) {
+    throw mapFirebaseAuthError(err, 'login');
+  }
+
+  try {
+    const snap = await getDocFromServer(doc(db, 'admins', uid));
+    if (!snap.exists()) {
+      await signOut(auth).catch(() => {});
+      throw new AdminApiError(
+        'Este usuário não possui mais permissão de administrador.',
         403
       );
     }
-    throw new AdminApiError('Erro ao salvar o hash da senha administrativa no banco online.');
+
+    const admin = parseAdminDoc(uid, snap.data() as Record<string, unknown>);
+    if (!admin.active) {
+      await signOut(auth).catch(() => {});
+      throw new AdminApiError(
+        'Este acesso administrativo está desativado. Solicite a reativação a outro administrador.',
+        403
+      );
+    }
+
+    return {
+      authenticated: true,
+      token: generateSessionToken(),
+      admin,
+    };
+  } catch (err) {
+    if (err instanceof AdminApiError) {
+      throw err;
+    }
+    await signOut(auth).catch(() => {});
+    throw new AdminApiError('Erro ao verificar as permissões deste usuário no banco de dados.');
   }
-
-  return {
-    authenticated: true,
-    token: `${FIREBASE_TOKEN_PREFIX}${generateRandomHex(24)}`,
-    expiresAt: Date.now() + FIREBASE_SESSION_TTL_MS,
-    source: 'firestore',
-  };
-}
-
-export async function verifyFirebaseAdminPasscode(
-  password: string,
-  record: FirebasePasscodeRecord
-): Promise<AdminLoginResponse> {
-  const trimmed = password.trim();
-  if (!trimmed || trimmed.length > 128) {
-    throw new AdminApiError('Senha administrativa inválida.', 401);
-  }
-
-  const candidateHash = await derivePbkdf2Hex(trimmed, record.salt, record.iterations);
-  if (!constantTimeEqualHex(candidateHash, record.hash)) {
-    throw new AdminApiError('Senha administrativa incorreta.', 401);
-  }
-
-  return {
-    authenticated: true,
-    token: `${FIREBASE_TOKEN_PREFIX}${generateRandomHex(24)}`,
-    expiresAt: Date.now() + FIREBASE_SESSION_TTL_MS,
-    source: 'firestore',
-  };
 }
 
 export async function verifyAdminToken(token: string): Promise<boolean> {
-  if (token.startsWith(FIREBASE_TOKEN_PREFIX)) {
-    // In Firebase mode, Firestore Security Rules enforce isAdmin() on every single server write
-    return Boolean(auth.currentUser && auth.currentUser.emailVerified);
+  if (!token || !token.startsWith(ADMIN_SESSION_PREFIX)) {
+    return false;
   }
+  await auth.authStateReady();
+  // Firestore Security Rules enforce isAdmin() on every single server write
+  return Boolean(auth.currentUser);
+}
 
-  try {
-    const data = await fetchJsonWithRetry<{ valid?: boolean }>('/api/admin/verify', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    return Boolean(data.valid);
-  } catch (err) {
-    if (err instanceof AdminApiError && err.status === 401) {
-      return false;
-    }
-    throw err;
+export async function logoutAdminToken(_token: string, _keepalive = false): Promise<void> {
+  await clearGoogleSheetsSession();
+  if (auth.currentUser) {
+    await signOut(auth).catch(() => {});
   }
 }
 
-export async function logoutAdminToken(token: string, keepalive = false): Promise<void> {
-  if (token.startsWith(FIREBASE_TOKEN_PREFIX)) {
-    return;
+/** Real-time subscription to all admin accounts (requires active admin session) */
+export function subscribeToAdminAccounts(
+  onData: (accounts: AdminAccount[]) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const q = query(collection(db, 'admins'), where('role', '==', 'admin'));
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list = snapshot.docs.map((snap) =>
+        parseAdminDoc(snap.id, snap.data() as Record<string, unknown>)
+      );
+      list.sort((a, b) => a.username.localeCompare(b.username, 'pt-BR'));
+      onData(list);
+    },
+    (error) => {
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'admins');
+      } catch (wrapped) {
+        if (onError) onError(wrapped as Error);
+      }
+    }
+  );
+}
+
+/**
+ * Allows an active administrator to create an additional username+password admin login
+ * without interrupting their own active session.
+ */
+export async function createAdditionalAdminAccount(
+  adminToken: string,
+  params: {
+    username: string;
+    displayName?: string;
+    password: string;
+    confirmPassword: string;
+  },
+  existingAccounts: AdminAccount[]
+): Promise<AdminAccount> {
+  const valid = await verifyAdminToken(adminToken);
+  const currentAdmin = auth.currentUser;
+  if (!valid || !currentAdmin) {
+    throw new Error('Sessão administrativa expirada. Faça login novamente.');
+  }
+
+  const username = normalizeAdminUsername(params.username);
+  const displayName = (params.displayName?.trim() || username).slice(0, 80);
+  const password = params.password;
+  const confirmPassword = params.confirmPassword;
+
+  if (!isValidAdminUsername(username)) {
+    throw new AdminApiError(
+      'O nome de usuário deve ter entre 3 e 32 caracteres (apenas letras, números, ponto, traço ou sublinhado).',
+      400
+    );
+  }
+  if (displayName.length < 2) {
+    throw new AdminApiError('Informe um nome válido (mínimo 2 caracteres).', 400);
+  }
+  if (password.length < 6 || password.length > 128) {
+    throw new AdminApiError('A senha deve ter entre 6 e 128 caracteres.', 400);
+  }
+  if (password !== confirmPassword) {
+    throw new AdminApiError('A confirmação da senha não confere.', 400);
+  }
+  if (existingAccounts.some((acc) => acc.username === username)) {
+    throw new AdminApiError(`Já existe um administrador cadastrado com o usuário "${username}".`, 409);
+  }
+
+  const creatorAuth = getAdminCreatorAuth();
+  let newUser: (typeof creatorAuth)['currentUser'] = null;
+
+  try {
+    const cred = await createUserWithEmailAndPassword(
+      creatorAuth,
+      usernameToAuthEmail(username),
+      password
+    );
+    newUser = cred.user;
+
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'admins', newUser.uid), {
+      uid: newUser.uid,
+      username,
+      displayName,
+      role: 'admin',
+      active: true,
+      createdBy: currentAdmin.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    batch.set(doc(db, 'audit_logs', createAuditLogId()), {
+      action: 'create_admin',
+      scheduleId: 'admins',
+      scheduleName: 'Acessos Administrativos',
+      summary: `Novo login administrativo criado: ${username}`,
+      details: `Nome de exibição: ${displayName}`,
+      actorLabel: 'Administrador',
+      createdAt: serverTimestamp(),
+    });
+
+    await batch.commit();
+
+    const nowIso = new Date().toISOString();
+    return {
+      uid: newUser.uid,
+      username,
+      displayName,
+      role: 'admin',
+      active: true,
+      createdBy: currentAdmin.uid,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+    };
+  } catch (err) {
+    if (newUser) {
+      await deleteUser(newUser).catch(() => {});
+    }
+    if (err instanceof AdminApiError) {
+      throw err;
+    }
+    const code = (err as { code?: string })?.code ?? '';
+    if (code.startsWith('auth/')) {
+      throw mapFirebaseAuthError(err, 'register');
+    }
+    handleFirestoreError(err, OperationType.CREATE, 'admins');
+  } finally {
+    await signOut(creatorAuth).catch(() => {});
+  }
+}
+
+export async function toggleAdminAccountActive(
+  adminToken: string,
+  account: AdminAccount,
+  nextActive: boolean
+): Promise<void> {
+  const valid = await verifyAdminToken(adminToken);
+  const currentAdmin = auth.currentUser;
+  if (!valid || !currentAdmin) {
+    throw new Error('Sessão administrativa expirada. Faça login novamente.');
+  }
+  if (account.uid === currentAdmin.uid && !nextActive) {
+    throw new AdminApiError('Você não pode desativar o seu próprio acesso.', 400);
   }
 
   try {
-    await fetch('/api/admin/logout', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      credentials: 'same-origin',
-      cache: 'no-store',
-      keepalive,
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'admins', account.uid), {
+      active: nextActive,
+      updatedAt: serverTimestamp(),
     });
-  } catch {
-    // Best-effort revocation when closing or leaving admin view
+    batch.set(doc(db, 'audit_logs', createAuditLogId()), {
+      action: 'update_admin',
+      scheduleId: 'admins',
+      scheduleName: 'Acessos Administrativos',
+      summary: nextActive
+        ? `Acesso administrativo reativado: ${account.username}`
+        : `Acesso administrativo desativado: ${account.username}`,
+      details: `Usuário: ${account.username} (${account.displayName})`,
+      actorLabel: 'Administrador',
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `admins/${account.uid}`);
+  }
+}
+
+export async function updateAdminDisplayName(
+  adminToken: string,
+  account: AdminAccount,
+  nextDisplayName: string
+): Promise<void> {
+  const valid = await verifyAdminToken(adminToken);
+  if (!valid || !auth.currentUser) {
+    throw new Error('Sessão administrativa expirada. Faça login novamente.');
+  }
+
+  const trimmed = nextDisplayName.trim().slice(0, 80);
+  if (trimmed.length < 2) {
+    throw new AdminApiError('Informe um nome válido (mínimo 2 caracteres).', 400);
+  }
+
+  try {
+    await updateDoc(doc(db, 'admins', account.uid), {
+      displayName: trimmed,
+      updatedAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, 'audit_logs', createAuditLogId()), {
+      action: 'update_admin',
+      scheduleId: 'admins',
+      scheduleName: 'Acessos Administrativos',
+      summary: `Nome atualizado para o login ${account.username}`,
+      details: `${account.displayName} → ${trimmed}`,
+      actorLabel: 'Administrador',
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, `admins/${account.uid}`);
+  }
+}
+
+export async function deleteAdminAccount(
+  adminToken: string,
+  account: AdminAccount
+): Promise<void> {
+  const valid = await verifyAdminToken(adminToken);
+  const currentAdmin = auth.currentUser;
+  if (!valid || !currentAdmin) {
+    throw new Error('Sessão administrativa expirada. Faça login novamente.');
+  }
+  if (account.uid === currentAdmin.uid) {
+    throw new AdminApiError('Você não pode remover o seu próprio acesso.', 400);
+  }
+
+  try {
+    await deleteDoc(doc(db, 'admins', account.uid));
+    await setDoc(doc(db, 'audit_logs', createAuditLogId()), {
+      action: 'delete_admin',
+      scheduleId: 'admins',
+      scheduleName: 'Acessos Administrativos',
+      summary: `Acesso administrativo removido: ${account.username}`,
+      details: `Permissões revogadas imediatamente para ${account.displayName} (${account.username}).`,
+      actorLabel: 'Administrador',
+      createdAt: serverTimestamp(),
+    });
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, `admins/${account.uid}`);
+  }
+}
+
+export async function changeOwnAdminPassword(params: {
+  currentPassword: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}): Promise<void> {
+  const currentUser = auth.currentUser;
+  if (!currentUser || !currentUser.email) {
+    throw new AdminApiError('Sessão administrativa expirada. Faça login novamente.', 401);
+  }
+  if (!params.currentPassword) {
+    throw new AdminApiError('Informe sua senha atual.', 400);
+  }
+  if (params.newPassword.length < 6 || params.newPassword.length > 128) {
+    throw new AdminApiError('A nova senha deve ter entre 6 e 128 caracteres.', 400);
+  }
+  if (params.newPassword !== params.confirmNewPassword) {
+    throw new AdminApiError('A confirmação da nova senha não confere.', 400);
+  }
+
+  try {
+    const credential = EmailAuthProvider.credential(currentUser.email, params.currentPassword);
+    await reauthenticateWithCredential(currentUser, credential);
+    await updatePassword(currentUser, params.newPassword);
+  } catch (err) {
+    throw mapFirebaseAuthError(err, 'password');
   }
 }

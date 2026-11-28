@@ -186,7 +186,21 @@ export type AuditAction =
   | 'delete_mission'
   | 'create_leave'
   | 'delete_leave'
-  | 'update_calendar_day';
+  | 'update_calendar_day'
+  | 'create_admin'
+  | 'update_admin'
+  | 'delete_admin';
+
+export interface AdminAccount {
+  uid: string;
+  username: string;
+  displayName: string;
+  role: 'admin';
+  active: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface AuditLogEntry {
   id: string;

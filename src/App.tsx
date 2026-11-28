@@ -33,6 +33,7 @@ import {
   subscribeToSchedules,
 } from './lib/scheduleService';
 import type {
+  AdminAccount,
   AuditLogEntry,
   CalendarDayOverride,
   MissionRecord,
@@ -48,6 +49,7 @@ interface AppRestoredState {
   focusedDate: string;
   searchSeedQuery: string;
   adminToken: string | null;
+  currentAdmin?: AdminAccount | null;
 }
 
 export default function App() {
@@ -81,6 +83,9 @@ export default function App() {
 
   // Admin session (held in JS memory; handed off strictly once during an automatic app update reload)
   const [adminToken, setAdminToken] = useState<string | null>(restoredApp?.adminToken ?? null);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminAccount | null>(
+    restoredApp?.currentAdmin ?? null
+  );
   const [showAdminModal, setShowAdminModal] = useState(false);
   const adminTokenRef = useRef<string | null>(null);
   adminTokenRef.current = adminToken;
@@ -92,6 +97,7 @@ export default function App() {
     focusedDate,
     searchSeedQuery,
     adminToken,
+    currentAdmin,
   });
   appStateRef.current = {
     activeView,
@@ -100,6 +106,7 @@ export default function App() {
     focusedDate,
     searchSeedQuery,
     adminToken,
+    currentAdmin,
   };
 
   // Register app-level state snapshot for zero-loss automatic update reloads
@@ -188,10 +195,11 @@ export default function App() {
     };
   }, [isAdminSessionActive]);
 
-  // Revoke server session immediately when exiting Admin Area (forces password on every re-entry)
+  // Revoke server session immediately when exiting Admin Area (forces login on every re-entry)
   const terminateAdminSession = useCallback(async () => {
     const tokenToRevoke = adminTokenRef.current;
     setAdminToken(null);
+    setCurrentAdmin(null);
     if (tokenToRevoke) {
       await logoutAdminToken(tokenToRevoke, true);
     }
@@ -330,6 +338,7 @@ export default function App() {
                 {activeView === 'admin' && adminToken && (
                   <AdminDashboard
                     adminToken={adminToken}
+                    currentAdmin={currentAdmin}
                     isCloudSynced={isCloudSynced}
                     schedules={schedules}
                     entriesBySchedule={entriesBySchedule}
@@ -371,8 +380,9 @@ export default function App() {
           <AdminAuthModal
             isOpen={showAdminModal}
             onClose={() => setShowAdminModal(false)}
-            onAuthenticated={(token) => {
+            onAuthenticated={(token, admin) => {
               setAdminToken(token);
+              setCurrentAdmin(admin);
               setShowAdminModal(false);
               setActiveView('admin');
             }}

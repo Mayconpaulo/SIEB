@@ -26,6 +26,9 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   create_leave: 'Folga registrada',
   delete_leave: 'Folga removida',
   update_calendar_day: 'Dia alterado',
+  create_admin: 'Novo acesso admin',
+  update_admin: 'Acesso admin alterado',
+  delete_admin: 'Acesso admin removido',
 };
 
 function formatDateTimePt(iso: string): string {

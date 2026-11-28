@@ -18,6 +18,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  ShieldCheck,
   Table2,
   TableProperties,
   Trash2,
@@ -85,6 +86,7 @@ import {
 import {
   BLUEPRINT_LIMITS,
   SCALE_MODE_LABELS,
+  type AdminAccount,
   type AuditLogEntry,
   type CalendarDayOverride,
   type ColumnKind,
@@ -97,12 +99,14 @@ import {
 } from '../types/schedule';
 import { AdminMissionsLeavesTab } from './AdminMissionsLeavesTab';
 import { AdminPersonnelTab } from './AdminPersonnelTab';
+import { AdminUsersTab } from './AdminUsersTab';
 import { AuditHistoryView } from './AuditHistoryView';
 import { DynamicMatrixView } from './DynamicMatrixView';
 import { PersonnelAutocompleteInput } from './PersonnelAutocompleteInput';
 
 interface AdminDashboardProps {
   adminToken: string;
+  currentAdmin?: AdminAccount | null;
   isCloudSynced: boolean;
   schedules: ScheduleModel[];
   entriesBySchedule: Record<string, ScheduleEntry[]>;
@@ -116,7 +120,7 @@ interface AdminDashboardProps {
   onExitAdmin: () => void;
 }
 
-type AdminTab = 'entries' | 'missions' | 'personnel' | 'matrix' | 'models' | 'history';
+type AdminTab = 'entries' | 'missions' | 'personnel' | 'matrix' | 'models' | 'users' | 'history';
 
 interface DiffItem {
   date: string;
@@ -131,6 +135,7 @@ const ADMIN_TABS: { id: AdminTab; label: string; icon: React.ComponentType<{ cla
   { id: 'personnel', label: 'Efetivo', icon: Users },
   { id: 'matrix', label: 'Planilha', icon: TableProperties },
   { id: 'models', label: 'Modelos', icon: Layers },
+  { id: 'users', label: 'Acessos', icon: ShieldCheck },
   { id: 'history', label: 'Histórico', icon: History },
 ];
 
@@ -166,6 +171,7 @@ function formatDiffDisplayValue(raw: string): string {
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   adminToken,
+  currentAdmin = null,
   isCloudSynced,
   schedules,
   entriesBySchedule,
@@ -505,7 +511,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (msg.includes('Missing or insufficient permissions')) {
       setFeedback({
         type: 'error',
-        text: 'Sua conta Google não possui permissão de escrita nas regras do banco. Verifique se entrou com a conta administradora.',
+        text: 'Seu usuário não possui permissão de escrita nas regras do banco. Faça login novamente com um acesso administrador ativo.',
       });
       return;
     }
@@ -1094,7 +1100,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="btl-card p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="text-xs text-[#A8D8BE] font-semibold">
-            Sessão Administrativa Ativa
+            {currentAdmin
+              ? `Sessão Ativa · ${currentAdmin.displayName} (@${currentAdmin.username})`
+              : 'Sessão Administrativa Ativa'}
           </div>
           <h1 className="font-display text-xl sm:text-2xl font-bold text-[#F4E6C4]">
             Painel Administrativo
@@ -1719,7 +1727,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </motion.div>
         )}
 
-        {/* TAB 3: AUDIT HISTORY */}
+        {/* TAB 6: ADMIN ACCOUNTS MANAGER */}
+        {activeTab === 'users' && (
+          <motion.div
+            key="tab-users"
+            variants={VIEW_VARIANTS}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={TRANSITION_VIEW}
+          >
+            <AdminUsersTab
+              adminToken={adminToken}
+              currentAdmin={currentAdmin}
+              busyMessage={busyMessage}
+              setBusyMessage={setBusyMessage}
+              setFeedback={setFeedback}
+              onActionError={handleActionError}
+            />
+          </motion.div>
+        )}
+
+        {/* TAB 7: AUDIT HISTORY */}
         {activeTab === 'history' && (
           <motion.div
             key="tab-history"
